@@ -1,0 +1,20 @@
+# ==============================================================================
+# Purpose: Docker and Cloud Build context exclusions for Aurelia MCP Server.
+# Architecture/Context: Excludes virtual environments and local SQLite files
+#   during standalone MCP Server container builds.
+# Dependencies/Side Effects: Consumed by Docker and Google Cloud Build.
+# Author: Pradeep Singh
+# License: Apache-2.0
+# ==============================================================================
+
+.git/
+.env
+.env.*
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.db
+*.db-shm
+*.db-wal
+*.log
