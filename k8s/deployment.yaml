@@ -1,0 +1,105 @@
+# ==============================================================================
+# Purpose: Kubernetes Deployment, PersistentVolumeClaim, and LoadBalancer
+#   Service manifest for hosting Aurelia Bank CRM on Google Kubernetes Engine.
+# Architecture/Context: Deploys the containerized Flask/Gunicorn app with a
+#   PersistentVolumeClaim backing SQLite WAL storage and `/api/health` probes.
+# Dependencies/Side Effects: Requires a `bank-crm-secrets` Secret containing
+#   `SECRET_KEY` in the target GKE namespace.
+# Author: Pradeep Singh
+# License: Apache-2.0
+# ==============================================================================
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: bank-crm-sqlite-pvc
+  labels:
+    app: aurelia-bank-crm
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aurelia-bank-crm
+  labels:
+    app: aurelia-bank-crm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aurelia-bank-crm
+  template:
+    metadata:
+      labels:
+        app: aurelia-bank-crm
+    spec:
+      containers:
+        - name: bank-crm
+          image: us-central1-docker.pkg.dev/YOUR_GCP_PROJECT_ID/bank-crm-repo/aurelia-bank-crm:v1.0.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: FLASK_ENV
+              value: "production"
+            - name: FLASK_DEBUG
+              value: "false"
+            - name: PORT
+              value: "8080"
+            - name: DATABASE_PATH
+              value: "/data/bank_crm.db"
+            - name: AUTO_SEED_DATABASE
+              value: "true"
+            - name: HIGH_VALUE_WIRE_THRESHOLD_USD
+              value: "25000.00"
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: bank-crm-secrets
+                  key: SECRET_KEY
+          volumeMounts:
+            - name: sqlite-storage
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"
+      volumes:
+        - name: sqlite-storage
+          persistentVolumeClaim:
+            claimName: bank-crm-sqlite-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aurelia-bank-crm-svc
+  labels:
+    app: aurelia-bank-crm
+spec:
+  type: LoadBalancer
+  selector:
+    app: aurelia-bank-crm
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080

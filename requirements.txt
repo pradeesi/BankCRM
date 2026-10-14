@@ -1,0 +1,14 @@
+# ==============================================================================
+# Purpose: Python package dependencies for the Aurelia Bank CRM application.
+# Architecture/Context: Used by pip during local virtual environment setup and
+#   Docker image builds for Cloud Run and Google Kubernetes Engine (GKE).
+# Dependencies/Side Effects: Installs Flask web framework, dotenv loader, and
+#   Gunicorn WSGI production server.
+# Author: Pradeep Singh
+# License: Apache-2.0
+# ==============================================================================
+
+Flask==3.0.3
+python-dotenv==1.0.1
+gunicorn==22.0.0
+Werkzeug==3.0.4

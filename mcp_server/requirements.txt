@@ -1,0 +1,16 @@
+# ==============================================================================
+# Purpose: Python dependencies for the Aurelia Bank CRM MCP Server application.
+# Architecture/Context: Used by pip during local virtual environment setup and
+#   container builds for the standalone MCP Server microservice.
+# Dependencies/Side Effects: Installs the official Model Context Protocol SDK
+#   (`mcp` with FastMCP), Starlette/Uvicorn ASGI stack, and `python-dotenv`.
+# Author: Pradeep Singh
+# License: Apache-2.0
+# ==============================================================================
+
+mcp[cli]>=1.2.0,<2.0.0
+uvicorn>=0.30.0
+starlette>=0.38.0
+httpx>=0.27.0
+pydantic>=2.8.0
+python-dotenv==1.0.1

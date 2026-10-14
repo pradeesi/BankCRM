@@ -1,0 +1,155 @@
+<!-- ==========================================================================
+  Purpose: Customer 360 Directory view with instant search and compliance filters.
+  Architecture/Context: Extends `base.html`; displays all private wealth and
+    commercial banking clients with facet filters for Relationship Tier, KYC
+    status, and Relationship Manager.
+  Dependencies/Side Effects: Consumes `customers` and `filters` from `GET /customers`.
+  Author: Pradeep Singh
+  License: Apache-2.0
+=========================================================================== -->
+{% extends "base.html" %}
+{% block title %}Customer 360 Directory{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+  <div>
+    <h1 class="h4 fw-bold text-dark mb-1">Customer 360 Institutional Directory</h1>
+    <p class="text-secondary small mb-0">
+      Consolidated KYC/AML compliance postures, FICO credit ratings, and multi-account AUM across {{ customers | length }} client relationships.
+    </p>
+  </div>
+  <button type="button" class="btn btn-primary fw-semibold" data-bs-toggle="modal" data-bs-target="#onboardClientModal">
+    <i class="bi bi-person-plus-fill me-1"></i>Onboard New Client
+  </button>
+</div>
+
+<!-- Multi-Facet Search & Filter Bar -->
+<div class="crm-card p-3 mb-4">
+  <form action="{{ url_for('customers_view') }}" method="GET" class="row g-2 align-items-end">
+    <div class="col-md-4">
+      <label for="dirSearchInput" class="form-label small fw-bold text-secondary mb-1">Search Name, Entity, CIF, or City</label>
+      <div class="input-group input-group-sm">
+        <span class="input-group-text bg-white"><i class="bi bi-search text-secondary"></i></span>
+        <input id="dirSearchInput" type="search" name="q" value="{{ filters.q }}" class="form-control" placeholder="e.g., Sterling, Maritime, CIF-904821...">
+      </div>
+    </div>
+    <div class="col-md-2">
+      <label for="dirTierSelect" class="form-label small fw-bold text-secondary mb-1">Service Tier</label>
+      <select id="dirTierSelect" name="tier" class="form-select form-select-sm">
+        <option value="">All Tiers</option>
+        <option value="Obsidian Private" {% if filters.tier == 'Obsidian Private' %}selected{% endif %}>Obsidian Private</option>
+        <option value="Platinum Sovereign" {% if filters.tier == 'Platinum Sovereign' %}selected{% endif %}>Platinum Sovereign</option>
+        <option value="Sapphire Premier" {% if filters.tier == 'Sapphire Premier' %}selected{% endif %}>Sapphire Premier</option>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label for="dirKycSelect" class="form-label small fw-bold text-secondary mb-1">KYC Compliance</label>
+      <select id="dirKycSelect" name="kyc" class="form-select form-select-sm">
+        <option value="">All KYC States</option>
+        <option value="Verified" {% if filters.kyc == 'Verified' %}selected{% endif %}>Verified</option>
+        <option value="Enhanced Due Diligence" {% if filters.kyc == 'Enhanced Due Diligence' %}selected{% endif %}>Enhanced Due Diligence</option>
+        <option value="Periodic Review Due" {% if filters.kyc == 'Periodic Review Due' %}selected{% endif %}>Periodic Review Due</option>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label for="dirRmSelect" class="form-label small fw-bold text-secondary mb-1">Relationship Manager</label>
+      <select id="dirRmSelect" name="rm" class="form-select form-select-sm">
+        <option value="">All Advisors</option>
+        {% for adv in all_advisors %}
+        <option value="{{ adv.full_name }}" {% if filters.rm == adv.full_name %}selected{% endif %}>{{ adv.full_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2 d-flex gap-2">
+      <button type="submit" class="btn btn-sm btn-dark fw-semibold flex-grow-1">Apply Filters</button>
+      <a href="{{ url_for('customers_view') }}" class="btn btn-sm btn-outline-secondary" title="Clear Filters">Reset</a>
+    </div>
+  </form>
+</div>
+
+<!-- Client Directory Table -->
+<div class="crm-card overflow-hidden">
+  <div class="table-responsive">
+    <table class="table crm-table">
+      <thead>
+        <tr>
+          <th>CIF &amp; Client Identity</th>
+          <th>Segment &amp; Tier</th>
+          <th>KYC &amp; AML Risk</th>
+          <th>Credit Score</th>
+          <th>Holdings</th>
+          <th class="text-end">Total Managed AUM</th>
+          <th>Relationship Manager</th>
+          <th class="text-end">Dossier</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in customers %}
+        <tr>
+          <td>
+            <div class="d-flex align-items-center gap-3">
+              <div class="crm-avatar">
+                {{ c.full_name[:2] | upper }}
+              </div>
+              <div>
+                <a href="{{ url_for('customer_detail_view', customer_id=c.id) }}" class="fw-bold text-dark text-decoration-none">
+                  {{ c.full_name }}
+                </a>
+                <div class="text-muted small">{{ c.company_name }}</div>
+                <div class="font-mono text-secondary" style="font-size:0.74rem;">{{ c.cif_number }} &bull; {{ c.city }}, {{ c.country }}</div>
+              </div>
+            </div>
+          </td>
+          <td>
+            <span class="badge rounded-pill {% if 'Obsidian' in c.tier %}badge-tier-obsidian{% elif 'Platinum' in c.tier %}badge-tier-platinum{% else %}badge-tier-sapphire{% endif %} mb-1">
+              {{ c.tier }}
+            </span>
+            <div class="text-muted" style="font-size:0.75rem;">{{ c.segment }}</div>
+          </td>
+          <td>
+            <span class="badge {% if c.kyc_status == 'Verified' %}badge-kyc-verified{% elif 'Enhanced' in c.kyc_status %}badge-kyc-edd{% else %}badge-kyc-review{% endif %}">
+              {{ c.kyc_status }}
+            </span>
+            <div class="small mt-1">
+              AML Risk:
+              <strong class="{% if c.aml_risk_rating == 'High' %}text-danger{% elif c.aml_risk_rating == 'Medium' %}text-warning-emphasis{% else %}text-success{% endif %}">
+                {{ c.aml_risk_rating }}
+              </strong>
+            </div>
+          </td>
+          <td>
+            <span class="font-mono fw-bold {% if c.credit_score >= 800 %}text-success{% elif c.credit_score >= 760 %}text-primary{% else %}text-warning-emphasis{% endif %}">
+              {{ c.credit_score }}
+            </span>
+            <div class="text-muted" style="font-size:0.72rem;">FICO 8 Bureau</div>
+          </td>
+          <td>
+            <span class="badge bg-light text-dark border font-mono">{{ c.account_count }} Accts</span>
+            <span class="badge bg-light text-primary border font-mono">{{ c.loan_count }} Loans</span>
+          </td>
+          <td class="text-end">
+            <div class="font-mono fw-bold text-dark">{{ c.total_aum_usd | usd }}</div>
+            <div class="text-muted small font-mono">Inc: {{ c.annual_income_usd | usd_compact }}/yr</div>
+          </td>
+          <td>
+            <div class="fw-semibold text-dark small">{{ c.relationship_manager }}</div>
+            <div class="text-muted" style="font-size:0.73rem;">Last touch: {{ c.last_contact_date }}</div>
+          </td>
+          <td class="text-end">
+            <a href="{{ url_for('customer_detail_view', customer_id=c.id) }}" class="btn btn-sm btn-primary fw-semibold">
+              Open 360 <i class="bi bi-chevron-right ms-1"></i>
+            </a>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="8" class="text-center py-5 text-muted">
+            No client records match your current filter criteria.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

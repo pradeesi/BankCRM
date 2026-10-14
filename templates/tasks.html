@@ -1,0 +1,251 @@
+<!-- ==========================================================================
+  Purpose: Client Tasks, Touchpoints & AI Next-Best-Action Offers workspace.
+  Architecture/Context: Extends `base.html`; unifies relationship manager task
+    tracking, AI-scored product cross-sell recommendations, and client
+    interaction logs.
+  Dependencies/Side Effects: Consumes `workspace` and `status_filter` from `GET /tasks`.
+  Author: Pradeep Singh
+  License: Apache-2.0
+=========================================================================== -->
+{% extends "base.html" %}
+{% block title %}Tasks, Touchpoints &amp; Next-Best-Action{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+  <div>
+    <h1 class="h4 fw-bold text-dark mb-1">Client Tasks, Touchpoints &amp; AI Next-Best-Action Engine</h1>
+    <p class="text-secondary small mb-0">
+      Coordinate compliance deliverables, credit closings, executive briefings, and AI-driven wealth/treasury product mandates.
+    </p>
+  </div>
+  <div class="d-flex gap-2">
+    <button type="button" class="btn btn-outline-dark fw-semibold" data-bs-toggle="modal" data-bs-target="#globalLogInteractionModal">
+      <i class="bi bi-journal-plus me-1"></i>Log Client Touchpoint
+    </button>
+    <button type="button" class="btn btn-primary fw-semibold" data-bs-toggle="modal" data-bs-target="#newTaskModal">
+      <i class="bi bi-plus-circle-fill me-1"></i>Create Advisor Task
+    </button>
+  </div>
+</div>
+
+<!-- Row 1: Advisor & Compliance Tasks + AI Next-Best-Action Offers -->
+<div class="row g-3 mb-4">
+  <div class="col-xl-6">
+    <div class="crm-card overflow-hidden h-100">
+      <div class="p-3 px-4 border-bottom d-flex align-items-center justify-content-between">
+        <div>
+          <h2 class="h6 fw-bold text-dark mb-0">Relationship &amp; Compliance Deliverables ({{ workspace.tasks | length }})</h2>
+          <p class="text-muted small mb-0">Click the check button to toggle completion status</p>
+        </div>
+        <div class="btn-group btn-group-sm">
+          <a href="{{ url_for('tasks_view') }}" class="btn {% if not status_filter %}btn-dark{% else %}btn-outline-secondary{% endif %}">All</a>
+          <a href="{{ url_for('tasks_view', status='Pending') }}" class="btn {% if status_filter == 'Pending' %}btn-dark{% else %}btn-outline-secondary{% endif %}">Pending</a>
+          <a href="{{ url_for('tasks_view', status='Completed') }}" class="btn {% if status_filter == 'Completed' %}btn-dark{% else %}btn-outline-secondary{% endif %}">Completed</a>
+        </div>
+      </div>
+      <div class="list-group list-group-flush">
+        {% for tk in workspace.tasks %}
+        <div class="list-group-item p-3 px-4 d-flex align-items-start justify-content-between gap-3 {% if tk.status == 'Completed' %}bg-light opacity-75{% endif %}">
+          <div>
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+              <span class="badge {% if tk.priority == 'Critical' %}bg-danger{% elif tk.priority == 'High' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                {{ tk.priority }}
+              </span>
+              <span class="badge bg-light text-dark border">{{ tk.category }}</span>
+              <span class="text-muted font-mono small">Due {{ tk.due_date }}</span>
+              <span class="badge {% if tk.status == 'Completed' %}bg-success-subtle text-success{% else %}bg-primary-subtle text-primary{% endif %}">
+                {{ tk.status }}
+              </span>
+            </div>
+            <div class="fw-bold text-dark {% if tk.status == 'Completed' %}text-decoration-line-through{% endif %}">
+              {{ tk.title }}
+            </div>
+            <div class="text-secondary small mt-1">{{ tk.notes }}</div>
+            <div class="text-muted mt-1" style="font-size:0.75rem;">
+              Client: <a href="{{ url_for('customer_detail_view', customer_id=tk.customer_id) }}" class="fw-semibold text-decoration-none">{{ tk.customer_name }}</a>
+              ({{ tk.cif_number }}) &bull; Assigned to: <strong>{{ tk.assigned_to }}</strong>
+            </div>
+          </div>
+          <form action="{{ url_for('toggle_task_action', task_id=tk.id) }}" method="POST">
+            <button type="submit" class="btn btn-sm {% if tk.status == 'Completed' %}btn-success{% else %}btn-outline-success{% endif %}" title="Toggle Completion">
+              <i class="bi bi-check2-circle"></i>
+            </button>
+          </form>
+        </div>
+        {% else %}
+        <div class="p-4 text-center text-muted small">No tasks match the selected status filter.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Next-Best-Action Recommendations -->
+  <div class="col-xl-6">
+    <div class="crm-card overflow-hidden h-100">
+      <div class="p-3 px-4 border-bottom d-flex align-items-center justify-content-between">
+        <div>
+          <h2 class="h6 fw-bold text-dark mb-0">
+            <i class="bi bi-stars text-primary me-1"></i>Institutional Next-Best-Action (NBA) Propensity Queue
+          </h2>
+          <p class="text-muted small mb-0">Ranked by AI propensity match score &amp; incremental fee revenue</p>
+        </div>
+      </div>
+      <div class="list-group list-group-flush">
+        {% for offer in workspace.nba_offers %}
+        <div class="list-group-item p-3 px-4">
+          <div class="d-flex align-items-start justify-content-between gap-2 mb-1">
+            <div>
+              <span class="badge bg-primary text-white font-mono me-1">{{ offer.match_score_pct }}% Propensity</span>
+              <span class="badge bg-light text-dark border">{{ offer.product_category }}</span>
+            </div>
+            <div class="font-mono fw-bold text-success small">
+              +{{ offer.estimated_revenue_usd | usd }}/yr Fee Est.
+            </div>
+          </div>
+          <div class="fw-bold text-dark mt-1">{{ offer.product_name }}</div>
+          <div class="small text-primary fw-semibold mb-1">
+            Client: <a href="{{ url_for('customer_detail_view', customer_id=offer.customer_id) }}" class="text-decoration-none">{{ offer.customer_name }}</a>
+            ({{ offer.company_name }} &bull; AUM {{ offer.total_aum_usd | usd_compact }})
+          </div>
+          <p class="text-secondary small mb-2">{{ offer.rationale }}</p>
+          <div class="d-flex align-items-center justify-content-between pt-2 border-top">
+            <span class="badge {% if 'Accepted' in offer.status %}bg-success{% elif 'Pitched' in offer.status %}bg-info text-dark{% else %}bg-secondary-subtle text-secondary{% endif %}">
+              {{ offer.status }}
+            </span>
+            <div class="d-flex gap-2">
+              <form action="{{ url_for('update_nba_status_action', offer_id=offer.id) }}" method="POST">
+                <input type="hidden" name="status" value="Pitched — Client Reviewing">
+                <button type="submit" class="btn btn-xs btn-outline-primary py-1 px-2" style="font-size:0.75rem;">Mark Pitched</button>
+              </form>
+              <form action="{{ url_for('update_nba_status_action', offer_id=offer.id) }}" method="POST">
+                <input type="hidden" name="status" value="Accepted & Enrolled">
+                <button type="submit" class="btn btn-xs btn-success py-1 px-2" style="font-size:0.75rem;">Accept Mandate</button>
+              </form>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Row 2: Recent Client Interaction & Briefing Log -->
+<div class="crm-card overflow-hidden">
+  <div class="p-3 px-4 border-bottom d-flex align-items-center justify-content-between">
+    <div>
+      <h2 class="h6 fw-bold text-dark mb-0">Recent Advisory Briefings &amp; Compliance Touchpoints</h2>
+      <p class="text-muted small mb-0">Consolidated log across Private Wealth, Commercial Credit, and Risk Officers</p>
+    </div>
+    <button type="button" class="btn btn-sm btn-outline-dark fw-semibold" data-bs-toggle="modal" data-bs-target="#globalLogInteractionModal">
+      + Log Touchpoint
+    </button>
+  </div>
+  <div class="table-responsive">
+    <table class="table crm-table">
+      <thead>
+        <tr>
+          <th>Timestamp</th>
+          <th>Client &amp; Entity</th>
+          <th>Channel &amp; Sentiment</th>
+          <th>Briefing Subject &amp; Notes</th>
+          <th>Advisor</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in workspace.interactions %}
+        <tr>
+          <td class="font-mono small text-secondary" style="white-space: nowrap;">{{ item.logged_at }}</td>
+          <td>
+            <a href="{{ url_for('customer_detail_view', customer_id=item.customer_id) }}" class="fw-bold text-dark text-decoration-none">
+              {{ item.customer_name }}
+            </a>
+            <div class="text-muted small">{{ item.company_name }}</div>
+          </td>
+          <td>
+            <span class="badge bg-light text-dark border d-inline-block mb-1">{{ item.channel }}</span>
+            <div>
+              <span class="badge {% if item.sentiment == 'Positive' %}bg-success-subtle text-success{% elif item.sentiment == 'Attention Required' %}bg-danger-subtle text-danger{% else %}bg-secondary-subtle text-secondary{% endif %}">
+                {{ item.sentiment }}
+              </span>
+            </div>
+          </td>
+          <td>
+            <div class="fw-bold text-dark small">{{ item.subject }}</div>
+            <div class="text-secondary small">{{ item.summary }}</div>
+          </td>
+          <td class="fw-semibold text-dark small" style="white-space: nowrap;">{{ item.advisor_name }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal: Create New Advisor Task -->
+<div class="modal fade" id="newTaskModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header bg-dark text-white">
+        <h5 class="modal-title fw-bold"><i class="bi bi-check2-square text-primary me-2"></i>Schedule New Client Deliverable</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="{{ url_for('create_task_action') }}" method="POST">
+        <div class="modal-body p-4">
+          <div class="mb-3">
+            <label class="form-label small fw-bold text-secondary">Client Relationship *</label>
+            <select name="customer_id" class="form-select" required>
+              {% for cl in global_clients %}
+              <option value="{{ cl.id }}">{{ cl.full_name }} ({{ cl.company_name }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-bold text-secondary">Deliverable Title *</label>
+            <input type="text" name="title" class="form-control" placeholder="e.g., Prepare Q4 Family Office Tax-Loss Harvesting Proposal" required>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-secondary">Category</label>
+              <select name="category" class="form-select">
+                <option value="Portfolio Management">Portfolio Management</option>
+                <option value="Credit Origination">Credit Origination</option>
+                <option value="Compliance & AML">Compliance &amp; AML</option>
+                <option value="Treasury Onboarding">Treasury Onboarding</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-secondary">Priority Level</label>
+              <select name="priority" class="form-select">
+                <option value="Critical">Critical</option>
+                <option value="High" selected>High</option>
+                <option value="Medium">Medium</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-secondary">Target Due Date *</label>
+              <input type="date" name="due_date" class="form-control font-mono" value="2026-10-20" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-secondary">Assigned Officer</label>
+              <select name="assigned_to" class="form-select">
+                {% for adv in all_advisors %}
+                <option value="{{ adv.full_name }}" {% if adv.full_name == current_advisor.full_name %}selected{% endif %}>{{ adv.full_name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="mb-0">
+            <label class="form-label small fw-bold text-secondary">Context / Execution Notes</label>
+            <textarea name="notes" class="form-control" rows="2" placeholder="Optional instructions or required documents..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer bg-light">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary fw-semibold">Schedule Task</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

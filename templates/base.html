@@ -1,0 +1,368 @@
+<!-- ==========================================================================
+  Purpose: Master HTML5 layout shell for Aurelia Private Bank & Trust CRM.
+  Architecture/Context: Extended by all authenticated CRM views (`dashboard.html`,
+    `customers.html`, `customer_detail.html`, `loans.html`, `ledger.html`,
+    `tasks.html`); provides the fixed dark-navy sidebar, top persona switcher,
+    global quick-action modals, and flash alert banner.
+  Dependencies/Side Effects: Loads Bootstrap 5.3.3, Bootstrap Icons 1.11.3,
+    Chart.js 4.4.4, `static/css/styles.css`, and `static/js/app.js`.
+  Author: Pradeep Singh
+  License: Apache-2.0
+=========================================================================== -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="{{ bank_name }} — Institutional Relationship Manager, Private Wealth & Commercial Credit CRM Portal.">
+  <title>{% block title %}Executive CRM{% endblock %} | {{ bank_name }}</title>
+
+  <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Bootstrap 5.3.3 CSS & Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+
+  <!-- Custom Institutional Design System -->
+  <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
+</head>
+<body>
+  <div class="crm-layout">
+    <!-- Left Institutional Dark-Navy Sidebar -->
+    <aside id="crmSidebar" class="crm-sidebar" aria-label="Primary CRM Navigation">
+      <a href="{{ url_for('dashboard_view') }}" class="crm-brand">
+        <div class="crm-brand-crest">
+          <i class="bi bi-bank2"></i>
+        </div>
+        <div>
+          <div class="crm-brand-title">Aurelia Private Bank</div>
+          <div class="crm-brand-subtitle">Institutional CRM v4.2</div>
+        </div>
+      </a>
+
+      <div class="crm-nav-section-label">Advisory &amp; Relationship</div>
+      <ul class="crm-nav-list">
+        <li>
+          <a id="navDashboardLink" href="{{ url_for('dashboard_view') }}" class="crm-nav-link {% if active_page == 'dashboard' %}active{% endif %}">
+            <span><i class="bi bi-grid-1x2-fill"></i>Executive Dashboard</span>
+          </a>
+        </li>
+        <li>
+          <a id="navCustomersLink" href="{{ url_for('customers_view') }}" class="crm-nav-link {% if active_page == 'customers' %}active{% endif %}">
+            <span><i class="bi bi-people-fill"></i>Customer 360 Directory</span>
+            <span class="badge rounded-pill bg-secondary bg-opacity-25 text-light font-mono">{{ nav_kpis.client_count }}</span>
+          </a>
+        </li>
+        <li>
+          <a id="navTasksLink" href="{{ url_for('tasks_view') }}" class="crm-nav-link {% if active_page == 'tasks' %}active{% endif %}">
+            <span><i class="bi bi-lightning-charge-fill"></i>Tasks &amp; Next-Best-Action</span>
+            {% if nav_kpis.open_tasks_count > 0 %}
+            <span class="badge rounded-pill bg-primary text-white font-mono">{{ nav_kpis.open_tasks_count }}</span>
+            {% endif %}
+          </a>
+        </li>
+      </ul>
+
+      <div class="crm-nav-section-label">Capital &amp; Treasury Operations</div>
+      <ul class="crm-nav-list">
+        <li>
+          <a id="navLoansLink" href="{{ url_for('loans_view') }}" class="crm-nav-link {% if active_page == 'loans' %}active{% endif %}">
+            <span><i class="bi bi-briefcase-fill"></i>Credit &amp; Loan Pipeline</span>
+            <span class="badge rounded-pill bg-secondary bg-opacity-25 text-light font-mono">{{ nav_kpis.loan_count }}</span>
+          </a>
+        </li>
+        <li>
+          <a id="navLedgerLink" href="{{ url_for('ledger_view') }}" class="crm-nav-link {% if active_page == 'ledger' %}active{% endif %}">
+            <span><i class="bi bi-arrow-left-right"></i>Wire &amp; Account Ledger</span>
+            {% if nav_kpis.flagged_txn_count > 0 %}
+            <span class="badge rounded-pill bg-danger text-white font-mono" title="AML / Risk Flagged Wires">{{ nav_kpis.flagged_txn_count }}</span>
+            {% endif %}
+          </a>
+        </li>
+      </ul>
+
+      <div class="crm-nav-section-label">Quick Desk Actions</div>
+      <div class="px-3 d-grid gap-2">
+        <button id="sidebarNewClientBtn" type="button" class="btn btn-sm btn-primary text-start fw-semibold py-2 px-3" data-bs-toggle="modal" data-bs-target="#onboardClientModal">
+          <i class="bi bi-person-plus-fill me-2"></i>Onboard New Client
+        </button>
+        <button id="sidebarQuickWireBtn" type="button" class="btn btn-sm btn-outline-light text-start fw-medium py-2 px-3 border-secondary border-opacity-50" data-bs-toggle="modal" data-bs-target="#globalLogInteractionModal">
+          <i class="bi bi-journal-plus me-2 text-info"></i>Log Client Touchpoint
+        </button>
+      </div>
+
+      <!-- Active Advisor Footer & Demo Reset -->
+      <div class="crm-sidebar-footer">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <div class="d-flex align-items-center gap-2 overflow-hidden">
+            <div class="crm-avatar bg-primary text-white" style="width:34px;height:34px;font-size:0.78rem;">
+              {{ current_advisor.avatar_initials }}
+            </div>
+            <div class="text-truncate">
+              <div class="text-white fw-semibold small text-truncate">{{ current_advisor.full_name }}</div>
+              <div class="text-secondary" style="font-size:0.71rem;">{{ current_advisor.branch_location }}</div>
+            </div>
+          </div>
+          <a href="{{ url_for('login_view') }}" class="btn btn-sm btn-link text-secondary p-1" title="Switch Session / Lock">
+            <i class="bi bi-box-arrow-right fs-6"></i>
+          </a>
+        </div>
+        <form action="{{ url_for('reset_demo_action') }}" method="POST" class="mt-2">
+          <button id="resetDemoDbBtn" type="submit" class="btn btn-xs btn-outline-secondary w-100 py-1" style="font-size:0.73rem;">
+            <i class="bi bi-arrow-counterclockwise me-1"></i>Reset &amp; Re-seed Demo Data
+          </button>
+        </form>
+      </div>
+    </aside>
+
+    <!-- Main Fluid Content Area -->
+    <div class="crm-main">
+      <!-- Top Institutional Header Bar -->
+      <header class="crm-topbar">
+        <div class="d-flex align-items-center gap-3">
+          <button id="sidebarToggleBtn" type="button" class="btn btn-sm btn-outline-secondary d-lg-none" aria-label="Toggle Navigation">
+            <i class="bi bi-list fs-5"></i>
+          </button>
+          <form action="{{ url_for('customers_view') }}" method="GET" class="d-none d-md-flex align-items-center">
+            <div class="input-group input-group-sm" style="width: 340px;">
+              <span class="input-group-text bg-light border-end-0 text-secondary">
+                <i class="bi bi-search"></i>
+              </span>
+              <input
+                id="globalClientSearchInput"
+                type="search"
+                name="q"
+                class="form-control bg-light border-start-0"
+                placeholder="Search CIF, client name, company, or city..."
+                aria-label="Global Client Search"
+              >
+            </div>
+          </form>
+        </div>
+
+        <div class="d-flex align-items-center gap-3">
+          <div class="d-none d-xl-flex align-items-center gap-3 pe-2 border-end">
+            <div class="text-end">
+              <div class="text-secondary" style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;">Total Bank AUM</div>
+              <div class="fw-bold font-mono text-dark small">{{ nav_kpis.total_aum_usd | usd_compact }}</div>
+            </div>
+            <div class="text-end">
+              <div class="text-secondary" style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;">Credit Pipeline</div>
+              <div class="fw-bold font-mono text-primary small">{{ nav_kpis.loan_pipeline_usd | usd_compact }}</div>
+            </div>
+          </div>
+
+          <!-- Instant Persona Role Switcher -->
+          <form action="{{ url_for('switch_persona_action') }}" method="POST" class="d-flex align-items-center gap-2">
+            <input type="hidden" name="next_url" value="{{ request.full_path }}">
+            <label for="navbarPersonaSelect" class="small text-secondary fw-semibold d-none d-sm-inline mb-0">
+              <i class="bi bi-shield-check text-primary me-1"></i>Role:
+            </label>
+            <select
+              id="navbarPersonaSelect"
+              name="advisor_email"
+              class="form-select form-select-sm fw-semibold border-secondary-subtle"
+              style="min-width: 245px;"
+              onchange="this.form.submit()"
+              aria-label="Switch Active Bank Staff Persona"
+            >
+              {% for adv in all_advisors %}
+              <option value="{{ adv.email }}" {% if adv.email == current_advisor.email %}selected{% endif %}>
+                {{ adv.full_name }} — {{ adv.role_title.split('—')[0] | trim }}
+              </option>
+              {% endfor %}
+            </select>
+          </form>
+        </div>
+      </header>
+
+      <!-- Flash Notification Banner -->
+      <main class="crm-content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <div class="mb-4">
+              {% for category, message in messages %}
+                <div class="alert alert-{{ category if category != 'message' else 'info' }} alert-dismissible fade show shadow-sm border-0 d-flex align-items-center mb-2" role="alert">
+                  <i class="bi {% if category == 'success' %}bi-check-circle-fill text-success{% elif category == 'danger' %}bi-exclamation-octagon-fill text-danger{% elif category == 'warning' %}bi-shield-exclamation text-warning{% else %}bi-info-circle-fill text-primary{% endif %} fs-5 me-3"></i>
+                  <div class="fw-medium small">{{ message }}</div>
+                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </div>
+
+  <!-- Global Modal: Onboard New Banking Client -->
+  <div class="modal fade" id="onboardClientModal" tabindex="-1" aria-labelledby="onboardClientModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header bg-dark text-white">
+          <h5 class="modal-title fw-bold" id="onboardClientModalLabel">
+            <i class="bi bi-person-plus-fill text-primary me-2"></i>Onboard Institutional / Private Wealth Client
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form action="{{ url_for('create_customer_action') }}" method="POST">
+          <div class="modal-body p-4">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label small fw-bold text-secondary">Client Full Name *</label>
+                <input type="text" name="full_name" class="form-control" placeholder="e.g., Evelyn Vance-Kerrigan" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small fw-bold text-secondary">Entity / Family Office / Company *</label>
+                <input type="text" name="company_name" class="form-control" placeholder="e.g., Kerrigan Global Capital LP" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small fw-bold text-secondary">Email Address *</label>
+                <input type="email" name="email" class="form-control" placeholder="e.vance@kerrigancapital.com" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small fw-bold text-secondary">Primary Telephone *</label>
+                <input type="text" name="phone" class="form-control" value="+1 (212) 555-0199" required>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small fw-bold text-secondary">Client Segment</label>
+                <select name="segment" class="form-select">
+                  <option value="Ultra-High-Net-Worth (UHNW)">Ultra-High-Net-Worth (UHNW)</option>
+                  <option value="Institutional & Family Office">Institutional &amp; Family Office</option>
+                  <option value="Commercial & Executive" selected>Commercial &amp; Executive</option>
+                  <option value="High-Net-Worth (HNW)">High-Net-Worth (HNW)</option>
+                  <option value="Affluent & Emerging Wealth">Affluent &amp; Emerging Wealth</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small fw-bold text-secondary">Relationship Tier</label>
+                <select name="tier" class="form-select">
+                  <option value="Obsidian Private">Obsidian Private ($10M+)</option>
+                  <option value="Platinum Sovereign" selected>Platinum Sovereign ($2M+)</option>
+                  <option value="Sapphire Premier">Sapphire Premier ($500K+)</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small fw-bold text-secondary">Assigned Relationship Manager</label>
+                <select name="relationship_manager" class="form-select">
+                  {% for adv in all_advisors %}
+                  <option value="{{ adv.full_name }}" {% if adv.full_name == current_advisor.full_name %}selected{% endif %}>{{ adv.full_name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small fw-bold text-secondary">Primary City</label>
+                <input type="text" name="city" class="form-control" value="New York" required>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small fw-bold text-secondary">KYC Verification Status</label>
+                <select name="kyc_status" class="form-select">
+                  <option value="Verified" selected>Verified (CIP / FinCEN Complete)</option>
+                  <option value="Enhanced Due Diligence">Enhanced Due Diligence (EDD)</option>
+                  <option value="Periodic Review Due">Periodic Review Due</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small fw-bold text-secondary">Bureau Credit Score (300–850)</label>
+                <input type="number" name="credit_score" class="form-control font-mono" min="300" max="850" value="805" required>
+              </div>
+              <hr class="my-2">
+              <div class="col-md-4">
+                <label class="form-label small fw-bold text-secondary">Annual Income / EBITDA ($ USD)</label>
+                <input type="number" step="1000" name="annual_income_usd" class="form-control font-mono" value="1850000" required>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small fw-bold text-secondary">Initial Account Type</label>
+                <select name="initial_account_type" class="form-select">
+                  <option value="Private Wealth Advisory Portfolio">Private Wealth Advisory Portfolio</option>
+                  <option value="Commercial Treasury Sweep">Commercial Treasury Sweep</option>
+                  <option value="Family Office Global Custody">Family Office Global Custody</option>
+                  <option value="Sovereign Liquidity Checking">Sovereign Liquidity Checking</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small fw-bold text-secondary">Opening Wire Deposit ($ USD)</label>
+                <input type="number" step="1000" name="initial_deposit_usd" class="form-control font-mono" value="2500000" required>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer bg-light">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary fw-semibold px-4">
+              <i class="bi bi-check2-circle me-1"></i>Complete KYC &amp; Open Relationship
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Global Modal: Log Client Interaction Touchpoint -->
+  <div class="modal fade" id="globalLogInteractionModal" tabindex="-1" aria-labelledby="globalLogInteractionLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header bg-dark text-white">
+          <h5 class="modal-title fw-bold" id="globalLogInteractionLabel">
+            <i class="bi bi-journal-plus text-info me-2"></i>Log Advisory Call or Briefing
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form action="{{ url_for('create_interaction_action') }}" method="POST">
+          <div class="modal-body p-4">
+            <div class="mb-3">
+              <label class="form-label small fw-bold text-secondary">Select Client *</label>
+              <select name="customer_id" class="form-select" required>
+                {% for cl in global_clients %}
+                <option value="{{ cl.id }}">{{ cl.full_name }} ({{ cl.cif_number }} — {{ cl.company_name }})</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="row g-3 mb-3">
+              <div class="col-md-7">
+                <label class="form-label small fw-bold text-secondary">Engagement Channel</label>
+                <select name="channel" class="form-select">
+                  <option value="In-Person Executive Briefing">In-Person Executive Briefing</option>
+                  <option value="Encrypted Video Call">Encrypted Video Call</option>
+                  <option value="Phone Call">Phone Call</option>
+                  <option value="Wealth Advisory Dinner">Wealth Advisory Dinner</option>
+                  <option value="Compliance Outreach">Compliance Outreach</option>
+                </select>
+              </div>
+              <div class="col-md-5">
+                <label class="form-label small fw-bold text-secondary">Client Sentiment</label>
+                <select name="sentiment" class="form-select">
+                  <option value="Positive" selected>Positive</option>
+                  <option value="Neutral">Neutral</option>
+                  <option value="Attention Required">Attention Required</option>
+                </select>
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label small fw-bold text-secondary">Briefing Subject *</label>
+              <input type="text" name="subject" class="form-control" placeholder="e.g., Q4 Tax-Loss Harvesting & Credit Line Review" required>
+            </div>
+            <div class="mb-0">
+              <label class="form-label small fw-bold text-secondary">Executive Summary &amp; Action Notes *</label>
+              <textarea name="summary" class="form-control" rows="3" placeholder="Record key decisions, liquidity needs, or compliance documents collected..." required></textarea>
+            </div>
+          </div>
+          <div class="modal-footer bg-light">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary fw-semibold">Save Touchpoint to Dossier</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap 5.3.3 Bundle & Chart.js 4.4.4 -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,490 @@
+<!-- ==========================================================================
+  Purpose: Comprehensive Customer 360 Dossier view for an individual client.
+  Architecture/Context: Extends `base.html`; displays the client's executive
+    identity header, KYC/AML compliance controls, multi-account holdings,
+    Chart.js asset allocation mix, active credit facilities, AI Next-Best-Action
+    recommendations, ledger history, and advisor interaction timeline.
+  Dependencies/Side Effects: Consumes `client` dictionary from `GET /customers/<id>`.
+  Author: Pradeep Singh
+  License: Apache-2.0
+=========================================================================== -->
+{% extends "base.html" %}
+{% block title %}{{ client.full_name }} — Customer 360{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb & Quick Actions -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb mb-0 small">
+      <li class="breadcrumb-item"><a href="{{ url_for('customers_view') }}" class="text-decoration-none">Customer 360 Directory</a></li>
+      <li class="breadcrumb-item active fw-semibold" aria-current="page">{{ client.full_name }} ({{ client.cif_number }})</li>
+    </ol>
+  </nav>
+  <div class="d-flex flex-wrap gap-2">
+    <button type="button" class="btn btn-sm btn-outline-secondary fw-semibold" data-bs-toggle="modal" data-bs-target="#complianceUpdateModal">
+      <i class="bi bi-shield-check me-1"></i>KYC / Tier Review
+    </button>
+    <button type="button" class="btn btn-sm btn-outline-primary fw-semibold" data-bs-toggle="modal" data-bs-target="#openClientAccountModal">
+      <i class="bi bi-plus-circle me-1"></i>Open Account
+    </button>
+    <button type="button" class="btn btn-sm btn-primary fw-semibold" data-bs-toggle="modal" data-bs-target="#clientOriginateLoanModal">
+      <i class="bi bi-briefcase me-1"></i>Originate Credit Facility
+    </button>
+  </div>
+</div>
+
+<!-- Client Executive Identity Banner -->
+<div class="crm-card p-4 mb-4" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #ffffff;">
+  <div class="row align-items-center g-4">
+    <div class="col-lg-6">
+      <div class="d-flex align-items-center gap-3">
+        <div class="crm-avatar bg-primary text-white" style="width:60px;height:60px;font-size:1.35rem;border-radius:14px;">
+          {{ client.full_name[:2] | upper }}
+        </div>
+        <div>
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+            <h1 class="h4 fw-bold text-white mb-0">{{ client.full_name }}</h1>
+            <span class="badge rounded-pill bg-primary text-white">{{ client.tier }}</span>
+            <span class="badge {% if client.kyc_status == 'Verified' %}bg-success{% elif 'Enhanced' in client.kyc_status %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+              KYC: {{ client.kyc_status }}
+            </span>
+          </div>
+          <div class="text-white-50 small mb-1">
+            <strong class="text-light">{{ client.company_name }}</strong> &bull; {{ client.segment }} &bull; <span class="font-mono">{{ client.cif_number }}</span>
+          </div>
+          <div class="text-white-50" style="font-size:0.78rem;">
+            <i class="bi bi-envelope me-1"></i>{{ client.email }} &nbsp;|&nbsp;
+            <i class="bi bi-telephone me-1"></i>{{ client.phone }} &nbsp;|&nbsp;
+            <i class="bi bi-geo-alt me-1"></i>{{ client.city }}, {{ client.country }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="row g-2 text-lg-end">
+        <div class="col-6 col-sm-3">
+          <div class="text-white-50" style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;">Consolidated AUM</div>
+          <div class="h5 fw-bold font-mono text-white mb-0">{{ client.total_aum_usd | usd_compact }}</div>
+          <div class="text-info font-mono" style="font-size:0.72rem;">{{ client.accounts | length }} Active Accts</div>
+        </div>
+        <div class="col-6 col-sm-3">
+          <div class="text-white-50" style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;">Annual Income</div>
+          <div class="h5 fw-bold font-mono text-white mb-0">{{ client.annual_income_usd | usd_compact }}</div>
+          <div class="text-white-50" style="font-size:0.72rem;">Verified Cashflow</div>
+        </div>
+        <div class="col-6 col-sm-3">
+          <div class="text-white-50" style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;">Bureau Credit</div>
+          <div class="h5 fw-bold font-mono text-success mb-0">{{ client.credit_score }}</div>
+          <div class="text-white-50" style="font-size:0.72rem;">AML Risk: {{ client.aml_risk_rating }}</div>
+        </div>
+        <div class="col-6 col-sm-3">
+          <div class="text-white-50" style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;">Lead Advisor</div>
+          <div class="fw-bold text-white small">{{ client.relationship_manager }}</div>
+          <div class="text-white-50" style="font-size:0.72rem;">Since {{ client.onboarded_date }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Row 1: Multi-Account Holdings + Portfolio Allocation Chart -->
+<script id="clientPortfolioData" type="application/json">
+  {
+    "equities": {{ client.portfolio_equities_pct }},
+    "fixed_income": {{ client.portfolio_fixed_income_pct }},
+    "private_equity": {{ client.portfolio_private_equity_pct }},
+    "cash": {{ client.portfolio_cash_pct }}
+  }
+</script>
+
+<div class="row g-3 mb-4">
+  <div class="col-xl-8">
+    <div class="crm-card overflow-hidden h-100">
+      <div class="p-3 px-4 border-bottom d-flex align-items-center justify-content-between">
+        <div>
+          <h2 class="h6 fw-bold text-dark mb-0">Depository, Custody &amp; Wealth Accounts ({{ client.accounts | length }})</h2>
+          <p class="text-muted small mb-0">Real-time balances and yield structures across all linked accounts</p>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-primary fw-semibold" data-bs-toggle="modal" data-bs-target="#openClientAccountModal">
+          <i class="bi bi-plus-lg me-1"></i>New Account
+        </button>
+      </div>
+      <div class="table-responsive">
+        <table class="table crm-table">
+          <thead>
+            <tr>
+              <th>Account Number</th>
+              <th>Account Product Type</th>
+              <th>Status</th>
+              <th class="text-end">Yield (APY)</th>
+              <th class="text-end">Current Balance</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for acct in client.accounts %}
+            <tr>
+              <td class="font-mono fw-bold text-primary">{{ acct.account_number }}</td>
+              <td>
+                <div class="fw-semibold text-dark">{{ acct.account_type }}</div>
+                <div class="text-muted small">Opened {{ acct.opened_date }} &bull; {{ acct.currency }}</div>
+              </td>
+              <td>
+                <span class="badge {% if acct.status == 'Active' %}bg-success-subtle text-success{% else %}bg-warning-subtle text-warning-emphasis{% endif %}">
+                  {{ acct.status }}
+                </span>
+              </td>
+              <td class="text-end font-mono text-success fw-semibold">{{ acct.apy_rate }}%</td>
+              <td class="text-end font-mono fw-bold text-dark">{{ acct.balance_usd | usd }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-4">
+    <div class="crm-card p-4 h-100">
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <h2 class="h6 fw-bold text-dark mb-0">Strategic Asset Allocation</h2>
+        <span class="badge bg-light text-dark border font-mono">Target Mandate</span>
+      </div>
+      <p class="text-muted small mb-3">Advisory portfolio weighting across asset classes</p>
+      <div style="height: 220px;">
+        <canvas id="clientPortfolioChart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Row 2: AI Next-Best-Action Recommendations & Credit Facilities -->
+<div class="row g-3 mb-4">
+  <div class="col-xl-6">
+    <div class="crm-card overflow-hidden h-100">
+      <div class="p-3 px-4 border-bottom d-flex align-items-center justify-content-between">
+        <div>
+          <h2 class="h6 fw-bold text-dark mb-0">
+            <i class="bi bi-stars text-primary me-1"></i>AI Next-Best-Action Product Recommendations
+          </h2>
+          <p class="text-muted small mb-0">Tailored institutional cross-sell opportunities based on liquidity &amp; holdings</p>
+        </div>
+      </div>
+      <div class="list-group list-group-flush">
+        {% for offer in client.nba_offers %}
+        <div class="list-group-item p-3 px-4">
+          <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
+            <div>
+              <span class="badge bg-primary-subtle text-primary border border-primary-subtle me-1 font-mono">{{ offer.match_score_pct }}% Match</span>
+              <span class="badge bg-light text-secondary border">{{ offer.product_category }}</span>
+              <h3 class="h6 fw-bold text-dark mt-2 mb-1">{{ offer.product_name }}</h3>
+            </div>
+            <div class="text-end">
+              <div class="text-muted" style="font-size:0.7rem;">Est. Annual Fee Rev</div>
+              <div class="font-mono fw-bold text-success">{{ offer.estimated_revenue_usd | usd }}</div>
+            </div>
+          </div>
+          <p class="text-secondary small mb-3">{{ offer.rationale }}</p>
+          <div class="d-flex align-items-center justify-content-between">
+            <span class="badge {% if 'Accepted' in offer.status %}bg-success{% elif 'Pitched' in offer.status %}bg-info text-dark{% else %}bg-secondary-subtle text-secondary{% endif %}">
+              Status: {{ offer.status }}
+            </span>
+            <div class="d-flex gap-2">
+              <form action="{{ url_for('update_nba_status_action', offer_id=offer.id) }}" method="POST">
+                <input type="hidden" name="status" value="Pitched — Client Reviewing">
+                <button type="submit" class="btn btn-sm btn-outline-primary py-1">Log Pitch</button>
+              </form>
+              <form action="{{ url_for('update_nba_status_action', offer_id=offer.id) }}" method="POST">
+                <input type="hidden" name="status" value="Accepted & Enrolled">
+                <button type="submit" class="btn btn-sm btn-success py-1">Mark Accepted</button>
+              </form>
+            </div>
+          </div>
+        </div>
+        {% else %}
+        <div class="p-4 text-center text-muted small">No active Next-Best-Action offers for this client.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Client Active & Pipeline Credit Facilities -->
+  <div class="col-xl-6">
+    <div class="crm-card overflow-hidden h-100">
+      <div class="p-3 px-4 border-bottom d-flex align-items-center justify-content-between">
+        <div>
+          <h2 class="h6 fw-bold text-dark mb-0">Credit &amp; Lending Facilities ({{ client.loans | length }})</h2>
+          <p class="text-muted small mb-0">Underwriting parameters, LTV/DTI ratios, and stage controls</p>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-primary fw-semibold" data-bs-toggle="modal" data-bs-target="#clientOriginateLoanModal">
+          + New Facility
+        </button>
+      </div>
+      <div class="list-group list-group-flush">
+        {% for ln in client.loans %}
+        <div class="list-group-item p-3 px-4">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <span class="font-mono fw-bold text-primary small">{{ ln.loan_number }}</span>
+            <span class="badge bg-dark text-white font-mono">{{ ln.underwriting_grade }}</span>
+          </div>
+          <div class="d-flex align-items-baseline justify-content-between mb-1">
+            <div class="fw-bold text-dark">{{ ln.loan_type }}</div>
+            <div class="font-mono fw-bold text-dark fs-6">{{ ln.principal_usd | usd }}</div>
+          </div>
+          <div class="text-muted small mb-2">{{ ln.purpose }}</div>
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 pt-2 border-top small">
+            <div class="font-mono text-secondary">
+              Rate: <strong>{{ ln.interest_rate_pct }}%</strong> &bull;
+              LTV: <strong>{{ ln.ltv_ratio_pct }}%</strong> &bull;
+              DTI: <strong>{{ ln.dti_ratio_pct }}%</strong>
+            </div>
+            <form action="{{ url_for('update_loan_stage_action', loan_id=ln.id) }}" method="POST" class="d-flex align-items-center gap-1">
+              <select name="stage" class="form-select form-select-sm py-0" style="font-size:0.78rem;" onchange="this.form.submit()">
+                {% for st in ['Application & KYC Intake', 'Underwriting & Financial Analysis', 'Credit Committee Review', 'Approved & Ready to Fund', 'Disbursed & Active'] %}
+                <option value="{{ st }}" {% if ln.stage == st %}selected{% endif %}>{{ st }}</option>
+                {% endfor %}
+              </select>
+            </form>
+          </div>
+        </div>
+        {% else %}
+        <div class="p-4 text-center text-muted small">No active loan applications on file.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Row 3: Client Interaction Timeline & Recent Ledger Activity -->
+<div class="row g-3">
+  <div class="col-xl-5">
+    <div class="crm-card p-4 h-100">
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <div>
+          <h2 class="h6 fw-bold text-dark mb-0">Advisory Interaction &amp; Audit Timeline</h2>
+          <p class="text-muted small mb-0">Chronological record of briefings, pitches, and KYC reviews</p>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-dark" data-bs-toggle="modal" data-bs-target="#globalLogInteractionModal">
+          + Log Note
+        </button>
+      </div>
+      <div class="crm-timeline mt-3">
+        {% for item in client.interactions %}
+        <div class="crm-timeline-item">
+          <div class="crm-timeline-dot"></div>
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <span class="badge bg-light text-dark border">{{ item.channel }}</span>
+            <span class="text-muted font-mono" style="font-size:0.73rem;">{{ item.logged_at }}</span>
+          </div>
+          <div class="fw-bold text-dark small mb-1">{{ item.subject }}</div>
+          <p class="text-secondary small mb-1">{{ item.summary }}</p>
+          <div class="text-muted" style="font-size:0.73rem;">Logged by <strong>{{ item.advisor_name }}</strong> &bull; Sentiment: {{ item.sentiment }}</div>
+        </div>
+        {% else %}
+        <div class="text-muted small">No interactions recorded yet.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-7">
+    <div class="crm-card overflow-hidden h-100">
+      <div class="p-3 px-4 border-bottom d-flex align-items-center justify-content-between">
+        <div>
+          <h2 class="h6 fw-bold text-dark mb-0">Client Wire &amp; Account Ledger History</h2>
+          <p class="text-muted small mb-0">All credit inflows, SWIFT/FEDWIRE settlements, and internal transfers</p>
+        </div>
+        <a href="{{ url_for('ledger_view') }}" class="btn btn-sm btn-outline-secondary">Full Wire Desk</a>
+      </div>
+      <div class="table-responsive">
+        <table class="table crm-table">
+          <thead>
+            <tr>
+              <th>Reference</th>
+              <th>Account &amp; Channel</th>
+              <th>Counterparty</th>
+              <th>Status</th>
+              <th class="text-end">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for tx in client.transactions %}
+            <tr>
+              <td>
+                <div class="font-mono fw-semibold text-dark small">{{ tx.reference_id }}</div>
+                <div class="text-muted font-mono" style="font-size:0.72rem;">{{ tx.created_at }}</div>
+              </td>
+              <td>
+                <div class="font-mono small fw-semibold">{{ tx.account_number }}</div>
+                <div class="text-muted" style="font-size:0.74rem;">{{ tx.channel }}</div>
+              </td>
+              <td>
+                <div class="fw-semibold text-dark small">{{ tx.counterparty }}</div>
+                <div class="text-muted" style="font-size:0.73rem;">{{ tx.category }}</div>
+              </td>
+              <td>
+                {% if tx.risk_flag == 1 %}
+                  <span class="badge bg-danger-subtle text-danger border border-danger-subtle">{{ tx.status }}</span>
+                  <form action="{{ url_for('resolve_risk_action', transaction_id=tx.id) }}" method="POST" class="mt-1">
+                    <button type="submit" class="btn btn-xs btn-outline-success py-0 px-2" style="font-size:0.7rem;">
+                      Approve &amp; Clear Hold
+                    </button>
+                  </form>
+                {% else %}
+                  <span class="badge bg-success-subtle text-success">{{ tx.status }}</span>
+                {% endif %}
+              </td>
+              <td class="text-end font-mono fw-bold {% if tx.txn_type == 'Credit' %}text-success{% else %}text-dark{% endif %}">
+                {% if tx.txn_type == 'Credit' %}+{% else %}-{% endif %}{{ tx.amount_usd | usd }}
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="5" class="text-center py-4 text-muted small">No ledger transactions recorded for this client.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Update Client KYC / AML Risk & Tier -->
+<div class="modal fade" id="complianceUpdateModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header bg-dark text-white">
+        <h5 class="modal-title fw-bold"><i class="bi bi-shield-check text-info me-2"></i>Update KYC &amp; AML Compliance Profile</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="{{ url_for('update_customer_compliance_action', customer_id=client.id) }}" method="POST">
+        <div class="modal-body p-4">
+          <div class="mb-3">
+            <label class="form-label small fw-bold text-secondary">KYC Verification Status</label>
+            <select name="kyc_status" class="form-select">
+              <option value="Verified" {% if client.kyc_status == 'Verified' %}selected{% endif %}>Verified (CIP / FinCEN Complete)</option>
+              <option value="Enhanced Due Diligence" {% if client.kyc_status == 'Enhanced Due Diligence' %}selected{% endif %}>Enhanced Due Diligence (EDD)</option>
+              <option value="Periodic Review Due" {% if client.kyc_status == 'Periodic Review Due' %}selected{% endif %}>Periodic Review Due</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-bold text-secondary">AML Risk Rating</label>
+            <select name="aml_risk_rating" class="form-select">
+              <option value="Low" {% if client.aml_risk_rating == 'Low' %}selected{% endif %}>Low Risk</option>
+              <option value="Medium" {% if client.aml_risk_rating == 'Medium' %}selected{% endif %}>Medium Risk</option>
+              <option value="High" {% if client.aml_risk_rating == 'High' %}selected{% endif %}>High Risk (Enhanced Monitoring)</option>
+            </select>
+          </div>
+          <div class="mb-0">
+            <label class="form-label small fw-bold text-secondary">Relationship Service Tier</label>
+            <select name="tier" class="form-select">
+              <option value="Obsidian Private" {% if client.tier == 'Obsidian Private' %}selected{% endif %}>Obsidian Private ($10M+)</option>
+              <option value="Platinum Sovereign" {% if client.tier == 'Platinum Sovereign' %}selected{% endif %}>Platinum Sovereign ($2M+)</option>
+              <option value="Sapphire Premier" {% if client.tier == 'Sapphire Premier' %}selected{% endif %}>Sapphire Premier ($500K+)</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer bg-light">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary fw-semibold">Commit Compliance Review</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Open New Account for Client -->
+<div class="modal fade" id="openClientAccountModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header bg-dark text-white">
+        <h5 class="modal-title fw-bold"><i class="bi bi-wallet2 text-primary me-2"></i>Open New Account for {{ client.full_name }}</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="{{ url_for('create_account_action') }}" method="POST">
+        <input type="hidden" name="customer_id" value="{{ client.id }}">
+        <div class="modal-body p-4">
+          <div class="mb-3">
+            <label class="form-label small fw-bold text-secondary">Account Product Type</label>
+            <select name="account_type" class="form-select">
+              <option value="Private Wealth Advisory Portfolio">Private Wealth Advisory Portfolio</option>
+              <option value="Commercial Treasury Sweep">Commercial Treasury Sweep</option>
+              <option value="Family Office Global Custody">Family Office Global Custody</option>
+              <option value="Green Bond & Treasury Reserve">Green Bond &amp; Treasury Reserve</option>
+              <option value="Sovereign Liquidity Checking">Sovereign Liquidity Checking</option>
+            </select>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-secondary">Opening Deposit ($ USD)</label>
+              <input type="number" step="1000" name="initial_balance_usd" class="form-control font-mono" value="1000000" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-secondary">Contracted Yield (% APY)</label>
+              <input type="number" step="0.05" name="apy_rate" class="form-control font-mono" value="5.10" required>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer bg-light">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary fw-semibold">Open &amp; Fund Account</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Originate Credit Facility for Client -->
+<div class="modal fade" id="clientOriginateLoanModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header bg-dark text-white">
+        <h5 class="modal-title fw-bold"><i class="bi bi-briefcase-fill text-info me-2"></i>Originate Credit Facility — {{ client.full_name }}</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="{{ url_for('create_loan_action') }}" method="POST">
+        <input type="hidden" name="customer_id" value="{{ client.id }}">
+        <input type="hidden" name="return_to_customer" value="1">
+        <div class="modal-body p-4">
+          <div class="mb-3">
+            <label class="form-label small fw-bold text-secondary">Facility Structure</label>
+            <select name="loan_type" class="form-select">
+              <option value="Securities-Backed Line of Credit (SBLOC)">Securities-Backed Line of Credit (SBLOC)</option>
+              <option value="Commercial Real Estate Senior Mortgage">Commercial Real Estate Senior Mortgage</option>
+              <option value="Working Capital Revolving Line">Working Capital Revolving Line</option>
+              <option value="Jumbo Private Residential Mortgage">Jumbo Private Residential Mortgage</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-bold text-secondary">Underwriting Purpose *</label>
+            <input type="text" name="purpose" class="form-control" placeholder="e.g., Bridge liquidity for strategic acquisition" required>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-secondary">Principal Amount ($ USD)</label>
+              <input type="number" step="50000" name="principal_usd" class="form-control font-mono" value="3500000" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-secondary">Pledged Collateral ($ USD)</label>
+              <input type="number" step="50000" name="collateral_value_usd" class="form-control font-mono" value="6500000" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-secondary">Interest Rate (% APR)</label>
+              <input type="number" step="0.05" name="interest_rate_pct" class="form-control font-mono" value="5.75" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-secondary">Term (Months)</label>
+              <input type="number" name="term_months" class="form-control font-mono" value="60" required>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer bg-light">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary fw-semibold">Run Automated Underwriting &amp; Submit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

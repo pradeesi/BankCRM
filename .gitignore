@@ -1,0 +1,82 @@
+# ==============================================================================
+# Purpose: Git exclusion rules for the Aurelia Bank CRM & MCP Server repository.
+# Architecture/Context: Root repository configuration enforcing security hygiene
+#   by preventing secrets, runtime SQLite files, virtual environments, logs,
+#   and build artifacts (including under `mcp_server/`) from entering VCS.
+# Dependencies/Side Effects: Consumed by Git CLI and CI/CD pipelines.
+# Author: Pradeep Singh
+# License: Apache-2.0
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Secrets & Credential Protection
+# ------------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*credentials*.json
+*service-account*.json
+gcloud-service-key.json
+secrets/
+
+# ------------------------------------------------------------------------------
+# 2. Build, Runtime, Virtual Env & Dependency Artifacts
+# ------------------------------------------------------------------------------
+venv/
+.venv/
+env/
+**/venv/
+**/.venv/
+**/env/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+build/
+dist/
+*.egg-info/
+.eggs/
+.pytest_cache/
+**/.pytest_cache/
+.coverage
+htmlcov/
+*.log
+*.pid
+nohup.out
+
+# SQLite Runtime Databases & Journals
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-shm
+*.db-wal
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+**/*.db-journal
+**/*.db-shm
+**/*.db-wal
+instance/
+
+# ------------------------------------------------------------------------------
+# 3. OS & IDE Noise
+# ------------------------------------------------------------------------------
+.DS_Store
+**/.DS_Store
+Thumbs.db
+.Spotlight-V100
+.Trashes
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

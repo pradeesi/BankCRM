@@ -1,0 +1,94 @@
+# ==============================================================================
+# Purpose: Kubernetes Deployment and LoadBalancer Service manifest for hosting
+#   the Aurelia Bank CRM MCP Server on Google Kubernetes Engine (GKE).
+# Architecture/Context: Mounts the `bank-crm-sqlite-pvc` volume at `/data` (or
+#   standalone storage) and exposes `/sse`, `/messages/`, and `/health` on port 8081.
+# Dependencies/Side Effects: Reads optional `MCP_API_KEY` from `bank-crm-mcp-secrets`.
+# Author: Pradeep Singh
+# License: Apache-2.0
+# ==============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aurelia-bank-crm-mcp
+  labels:
+    app: aurelia-bank-crm-mcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aurelia-bank-crm-mcp
+  template:
+    metadata:
+      labels:
+        app: aurelia-bank-crm-mcp
+    spec:
+      containers:
+        - name: mcp-server
+          image: us-central1-docker.pkg.dev/YOUR_GCP_PROJECT_ID/bank-crm-repo/aurelia-bank-crm-mcp:v1.0.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8081
+          env:
+            - name: MCP_SERVER_NAME
+              value: "aurelia-bank-crm-mcp"
+            - name: MCP_TRANSPORT
+              value: "sse"
+            - name: MCP_HOST
+              value: "0.0.0.0"
+            - name: MCP_PORT
+              value: "8081"
+            - name: DATABASE_PATH
+              value: "/data/bank_crm.db"
+            - name: AUTO_SEED_DATABASE
+              value: "true"
+            - name: HIGH_VALUE_WIRE_THRESHOLD_USD
+              value: "25000.00"
+            - name: MCP_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: bank-crm-mcp-secrets
+                  key: MCP_API_KEY
+                  optional: true
+          volumeMounts:
+            - name: sqlite-storage
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"
+      volumes:
+        - name: sqlite-storage
+          persistentVolumeClaim:
+            claimName: bank-crm-sqlite-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aurelia-bank-crm-mcp-svc
+  labels:
+    app: aurelia-bank-crm-mcp
+spec:
+  type: LoadBalancer
+  selector:
+    app: aurelia-bank-crm-mcp
+  ports:
+    - protocol: TCP
+      port: 8081
+      targetPort: 8081

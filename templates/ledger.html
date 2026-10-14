@@ -1,0 +1,300 @@
+<!-- ==========================================================================
+  Purpose: Institutional Account & Wire Transfer Ledger view.
+  Architecture/Context: Extends `base.html`; provides live execution of SWIFT,
+    FEDWIRE, ACH, and Internal Book Transfers alongside automated AML/OFAC risk
+    screening and dual-control compliance sign-off.
+  Dependencies/Side Effects: Consumes `ledger` and `filters` from `GET /ledger`.
+  Author: Pradeep Singh
+  License: Apache-2.0
+=========================================================================== -->
+{% extends "base.html" %}
+{% block title %}Wire &amp; Account Ledger{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+  <div>
+    <h1 class="h4 fw-bold text-dark mb-1">Institutional Wire &amp; Account Settlement Ledger</h1>
+    <p class="text-secondary small mb-0">
+      Real-time FEDWIRE, SWIFT cross-border settlements, internal treasury book transfers, and automated AML risk screening (Threshold: {{ wire_threshold_usd | usd }}).
+    </p>
+  </div>
+  <div class="d-flex gap-2">
+    <button type="button" class="btn btn-outline-dark fw-semibold" data-bs-toggle="modal" data-bs-target="#newBankAccountModal">
+      <i class="bi bi-wallet2 me-1"></i>Open New Account
+    </button>
+    <button type="button" class="btn btn-primary fw-semibold" data-bs-toggle="modal" data-bs-target="#executeWireModal">
+      <i class="bi bi-send-check-fill me-1"></i>Execute Wire / Book Transfer
+    </button>
+  </div>
+</div>
+
+<!-- Ledger KPI Summary Strip -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-lg-3">
+    <div class="crm-card p-3 px-4">
+      <div class="crm-kpi-label">Gross Credit Inflows</div>
+      <div class="h4 fw-bold font-mono text-success mb-0">+{{ ledger.metrics.total_credits_usd | usd_compact }}</div>
+      <div class="text-muted small">Settled Institutional Deposits</div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="crm-card p-3 px-4">
+      <div class="crm-kpi-label">Gross Debit Outflows</div>
+      <div class="h4 fw-bold font-mono text-dark mb-0">-{{ ledger.metrics.total_debits_usd | usd_compact }}</div>
+      <div class="text-muted small">SWIFT, FEDWIRE &amp; Treasury Sweeps</div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="crm-card p-3 px-4">
+      <div class="crm-kpi-label">Active Accounts</div>
+      <div class="h4 fw-bold font-mono text-primary mb-0">{{ ledger.accounts | length }}</div>
+      <div class="text-muted small">Custody, Sweep &amp; Checking</div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="crm-card p-3 px-4">
+      <div class="crm-kpi-label">AML / OFAC Compliance Holds</div>
+      <div class="h4 fw-bold font-mono {% if ledger.metrics.flagged_count > 0 %}text-danger{% else %}text-success{% endif %} mb-0">
+        {{ ledger.metrics.flagged_count }} Pending Sign-Off
+      </div>
+      <div class="text-muted small">Dual-Control Officer Verification</div>
+    </div>
+  </div>
+</div>
+
+<!-- Filter & Search Bar -->
+<div class="crm-card p-3 mb-4">
+  <form action="{{ url_for('ledger_view') }}" method="GET" class="row g-2 align-items-end">
+    <div class="col-md-5">
+      <label class="form-label small fw-bold text-secondary mb-1">Search Reference, Counterparty, Client, or Account</label>
+      <input type="search" name="q" value="{{ filters.q }}" class="form-control form-control-sm" placeholder="e.g., TXN-2026, Rotterdam, Goldman Sachs, AUR-8801...">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small fw-bold text-secondary mb-1">Entry Direction</label>
+      <select name="type" class="form-select form-select-sm">
+        <option value="">All Credits &amp; Debits</option>
+        <option value="Credit" {% if filters.type == 'Credit' %}selected{% endif %}>Credits (Inflows Only)</option>
+        <option value="Debit" {% if filters.type == 'Debit' %}selected{% endif %}>Debits (Wires / Outflows Only)</option>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small fw-bold text-secondary mb-1">AML Screening</label>
+      <select name="risk" class="form-select form-select-sm">
+        <option value="">All Transactions</option>
+        <option value="1" {% if filters.risk == '1' %}selected{% endif %}>Flagged Holds Only</option>
+      </select>
+    </div>
+    <div class="col-md-2 d-flex gap-2">
+      <button type="submit" class="btn btn-sm btn-dark fw-semibold flex-grow-1">Filter</button>
+      <a href="{{ url_for('ledger_view') }}" class="btn btn-sm btn-outline-secondary">Reset</a>
+    </div>
+  </form>
+</div>
+
+<!-- Transactions Table -->
+<div class="crm-card overflow-hidden mb-4">
+  <div class="p-3 px-4 border-bottom d-flex align-items-center justify-content-between">
+    <h2 class="h6 fw-bold text-dark mb-0">Immutable Settlement Ledger ({{ ledger.transactions | length }} Entries)</h2>
+    <span class="badge bg-light text-secondary border font-mono">ACID Atomic SQLite</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table crm-table">
+      <thead>
+        <tr>
+          <th>Reference &amp; Timestamp</th>
+          <th>Client &amp; Account</th>
+          <th>Channel &amp; Counterparty</th>
+          <th>Compliance / Status</th>
+          <th class="text-end">Transaction Amount</th>
+          <th class="text-end">Post-Txn Balance</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for tx in ledger.transactions %}
+        <tr>
+          <td>
+            <div class="font-mono fw-bold text-dark">{{ tx.reference_id }}</div>
+            <div class="text-muted small font-mono">{{ tx.created_at }}</div>
+          </td>
+          <td>
+            <a href="{{ url_for('customer_detail_view', customer_id=tx.customer_id) }}" class="fw-bold text-dark text-decoration-none">
+              {{ tx.customer_name }}
+            </a>
+            <div class="text-muted small font-mono">{{ tx.account_number }} &bull; {{ tx.account_type }}</div>
+          </td>
+          <td>
+            <div class="fw-semibold text-dark">{{ tx.counterparty }}</div>
+            <div class="text-muted small">
+              <span class="badge bg-light text-dark border me-1">{{ tx.channel }}</span>{{ tx.category }}
+            </div>
+          </td>
+          <td>
+            {% if tx.risk_flag == 1 %}
+              <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-danger-subtle text-danger border border-danger-subtle">
+                  <i class="bi bi-shield-exclamation me-1"></i>{{ tx.status }}
+                </span>
+                <form action="{{ url_for('resolve_risk_action', transaction_id=tx.id) }}" method="POST">
+                  <button type="submit" class="btn btn-xs btn-success py-0 px-2 fw-semibold" style="font-size:0.72rem;">
+                    <i class="bi bi-check2-all me-1"></i>Approve &amp; Release
+                  </button>
+                </form>
+              </div>
+              <div class="text-danger mt-1" style="font-size:0.74rem;">{{ tx.risk_reason }}</div>
+            {% else %}
+              <span class="badge bg-success-subtle text-success border border-success-subtle">
+                <i class="bi bi-check-circle-fill me-1"></i>{{ tx.status }}
+              </span>
+              {% if tx.risk_reason %}
+              <div class="text-muted mt-1" style="font-size:0.71rem;">{{ tx.risk_reason }}</div>
+              {% endif %}
+            {% endif %}
+          </td>
+          <td class="text-end font-mono fw-bold {% if tx.txn_type == 'Credit' %}text-success{% else %}text-dark{% endif %}">
+            {% if tx.txn_type == 'Credit' %}+{% else %}-{% endif %}{{ tx.amount_usd | usd }}
+          </td>
+          <td class="text-end font-mono text-secondary">{{ tx.balance_after_usd | usd }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6" class="text-center py-4 text-muted">No ledger transactions match the selected filters.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal: Execute Wire, Deposit, or Internal Book Transfer -->
+<div class="modal fade" id="executeWireModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header bg-dark text-white">
+        <h5 class="modal-title fw-bold">
+          <i class="bi bi-send-check-fill text-primary me-2"></i>Execute Institutional Wire, Deposit, or Book Transfer
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="{{ url_for('execute_transaction_action') }}" method="POST">
+        <div class="modal-body p-4">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-secondary">Source / Target Bank Account *</label>
+              <select name="account_id" class="form-select font-mono" style="font-size:0.84rem;" required>
+                {% for acct in ledger.accounts %}
+                <option value="{{ acct.id }}">
+                  {{ acct.account_number }} — {{ acct.customer_name }} ({{ acct.balance_usd | usd }})
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small fw-bold text-secondary">Transaction Direction *</label>
+              <select id="txnTypeSelect" name="txn_type" class="form-select">
+                <option value="Debit">Debit (Outgoing Wire)</option>
+                <option value="Credit">Credit (Incoming Deposit)</option>
+                <option value="Internal Transfer">Internal Book Transfer</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small fw-bold text-secondary">Settlement Rail</label>
+              <select name="channel" class="form-select">
+                <option value="FEDWIRE">FEDWIRE (Domestic Instant)</option>
+                <option value="SWIFT International Wire">SWIFT International Wire</option>
+                <option value="ACH Institutional">ACH Institutional</option>
+                <option value="Internal Book Transfer">Internal Book Transfer</option>
+              </select>
+            </div>
+
+            <!-- Destination Account Selector (Shown only for Internal Transfer) -->
+            <div id="destAccountGroup" class="col-12 d-none">
+              <label class="form-label small fw-bold text-primary">Destination Internal Account *</label>
+              <select name="destination_account_id" class="form-select font-mono" style="font-size:0.84rem;">
+                {% for acct in ledger.accounts %}
+                <option value="{{ acct.id }}" {% if loop.index == 2 %}selected{% endif %}>
+                  {{ acct.account_number }} — {{ acct.customer_name }} ({{ acct.account_type }} | {{ acct.balance_usd | usd }})
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- External Counterparty Field -->
+            <div id="counterpartyGroup" class="col-md-8">
+              <label class="form-label small fw-bold text-secondary">Counterparty / Beneficiary Institution *</label>
+              <input id="counterpartyInput" type="text" name="counterparty" class="form-control" placeholder="e.g., Morgan Stanley Prime Custody / Zurich Aviation Escrow AG" required>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label small fw-bold text-secondary">Amount ($ USD) *</label>
+              <input type="number" step="0.01" min="1" name="amount_usd" class="form-control font-mono fw-bold" value="125000.00" required>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label small fw-bold text-secondary">Settlement Purpose Category</label>
+              <input type="text" name="category" class="form-control" value="Institutional Capital Settlement" required>
+            </div>
+          </div>
+
+          <div class="alert alert-info border-0 small mb-0 mt-3 d-flex align-items-center">
+            <i class="bi bi-shield-lock-fill fs-5 me-2"></i>
+            <div>
+              <strong>Automated FinCEN / OFAC Rule:</strong> Outgoing SWIFT wires &ge; {{ wire_threshold_usd | usd }} or domestic wires &ge; $500,000 are automatically flagged for Dual-Control Compliance Officer sign-off.
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer bg-light">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary fw-semibold px-4">Authorize &amp; Post to Ledger</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Open New Depository / Wealth Account -->
+<div class="modal fade" id="newBankAccountModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header bg-dark text-white">
+        <h5 class="modal-title fw-bold"><i class="bi bi-wallet2 text-info me-2"></i>Open Institutional Account</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="{{ url_for('create_account_action') }}" method="POST">
+        <div class="modal-body p-4">
+          <div class="mb-3">
+            <label class="form-label small fw-bold text-secondary">Select Client Relationship *</label>
+            <select name="customer_id" class="form-select" required>
+              {% for cl in global_clients %}
+              <option value="{{ cl.id }}">{{ cl.full_name }} ({{ cl.cif_number }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-bold text-secondary">Account Product Structure</label>
+            <select name="account_type" class="form-select">
+              <option value="Commercial Treasury Sweep">Commercial Treasury Sweep</option>
+              <option value="Private Wealth Advisory Portfolio">Private Wealth Advisory Portfolio</option>
+              <option value="Family Office Global Custody">Family Office Global Custody</option>
+              <option value="Sovereign Liquidity Checking">Sovereign Liquidity Checking</option>
+            </select>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-secondary">Opening Deposit ($ USD)</label>
+              <input type="number" step="1000" name="initial_balance_usd" class="form-control font-mono" value="500000" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-secondary">Yield Rate (% APY)</label>
+              <input type="number" step="0.05" name="apy_rate" class="form-control font-mono" value="4.85" required>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer bg-light">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary fw-semibold">Open Account</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

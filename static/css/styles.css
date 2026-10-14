@@ -1,0 +1,421 @@
+/* ============================================================================
+ * Purpose: Core institutional design system and custom Bootstrap 5 overrides
+ *   for Aurelia Private Bank & Trust CRM.
+ * Architecture/Context: Loaded after Bootstrap 5.3 CSS in `templates/base.html`
+ *   to establish the Dark-Navy & Slate Hybrid aesthetic (`#0B1120` sidebar,
+ *   elevated slate-ivory workspace canvas, and tabular financial typography).
+ * Dependencies/Side Effects: Uses Google Fonts ('Plus Jakarta Sans' &
+ *   'JetBrains Mono') and Bootstrap 5 CSS custom properties.
+ * Author: Pradeep Singh
+ * License: Apache-2.0
+ * ============================================================================ */
+
+:root {
+  --crm-sidebar-bg: #0b1120;
+  --crm-sidebar-surface: #131c31;
+  --crm-sidebar-border: rgba(255, 255, 255, 0.08);
+  --crm-sidebar-text: #94a3b8;
+  --crm-sidebar-active: #ffffff;
+  --crm-canvas-bg: #f1f5f9;
+  --crm-card-bg: #ffffff;
+  --crm-card-border: #e2e8f0;
+  --crm-text-primary: #0f172a;
+  --crm-text-secondary: #475569;
+  --crm-text-muted: #64748b;
+  --crm-accent-blue: #1d4ed8;
+  --crm-accent-blue-soft: rgba(29, 78, 216, 0.09);
+  --crm-gold: #b45309;
+  --crm-gold-soft: rgba(180, 83, 9, 0.11);
+  --crm-emerald: #047857;
+  --crm-emerald-soft: rgba(4, 120, 87, 0.1);
+  --crm-crimson: #be123c;
+  --crm-crimson-soft: rgba(190, 18, 60, 0.1);
+  --crm-sidebar-width: 272px;
+  --crm-radius-lg: 14px;
+  --crm-radius-md: 10px;
+  --crm-shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.03);
+  --crm-shadow-md: 0 10px 25px -5px rgba(15, 23, 42, 0.06), 0 4px 10px -3px rgba(15, 23, 42, 0.04);
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--crm-canvas-bg);
+  color: var(--crm-text-primary);
+  letter-spacing: -0.01em;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+.font-mono,
+.tabular-nums {
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ----------------------------------------------------------------------------
+ * Layout Shell: Fixed Institutional Sidebar + Fluid Main Workspace
+ * ---------------------------------------------------------------------------- */
+.crm-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.crm-sidebar {
+  width: var(--crm-sidebar-width);
+  background: linear-gradient(180deg, #0b1120 0%, #0f172a 100%);
+  color: var(--crm-sidebar-text);
+  border-right: 1px solid var(--crm-sidebar-border);
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1030;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.25s ease;
+}
+
+.crm-brand {
+  padding: 1.35rem 1.35rem 1.15rem;
+  border-bottom: 1px solid var(--crm-sidebar-border);
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  text-decoration: none;
+}
+
+.crm-brand-crest {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+  flex-shrink: 0;
+}
+
+.crm-brand-title {
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.98rem;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.crm-brand-subtitle {
+  color: #64748b;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+
+.crm-nav-section-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: #64748b;
+  font-weight: 700;
+  padding: 1.15rem 1.35rem 0.45rem;
+}
+
+.crm-nav-list {
+  list-style: none;
+  padding: 0 0.85rem;
+  margin: 0;
+}
+
+.crm-nav-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.68rem 0.85rem;
+  margin-bottom: 0.25rem;
+  border-radius: var(--crm-radius-md);
+  color: #94a3b8;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.88rem;
+  transition: all 0.16s ease;
+}
+
+.crm-nav-link:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+  color: #f8fafc;
+}
+
+.crm-nav-link.active {
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.22) 0%, rgba(37, 99, 235, 0.08) 100%);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 #3b82f6;
+}
+
+.crm-nav-link i {
+  font-size: 1.05rem;
+  margin-right: 0.75rem;
+  color: #64748b;
+  transition: color 0.16s ease;
+}
+
+.crm-nav-link.active i,
+.crm-nav-link:hover i {
+  color: #60a5fa;
+}
+
+.crm-sidebar-footer {
+  margin-top: auto;
+  padding: 1rem 1.15rem;
+  border-top: 1px solid var(--crm-sidebar-border);
+  background-color: rgba(15, 23, 42, 0.55);
+}
+
+/* ----------------------------------------------------------------------------
+ * Main Content Area & Top Institutional Header
+ * ---------------------------------------------------------------------------- */
+.crm-main {
+  margin-left: var(--crm-sidebar-width);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.crm-topbar {
+  background-color: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--crm-card-border);
+  padding: 0.85rem 1.75rem;
+  position: sticky;
+  top: 0;
+  z-index: 1020;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.crm-content {
+  padding: 1.75rem;
+  flex: 1;
+}
+
+/* ----------------------------------------------------------------------------
+ * Institutional KPI & Surface Cards
+ * ---------------------------------------------------------------------------- */
+.crm-card {
+  background-color: var(--crm-card-bg);
+  border: 1px solid var(--crm-card-border);
+  border-radius: var(--crm-radius-lg);
+  box-shadow: var(--crm-shadow-sm);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.crm-card-hover:hover {
+  box-shadow: var(--crm-shadow-md);
+  transform: translateY(-2px);
+}
+
+.crm-kpi-card {
+  position: relative;
+  overflow: hidden;
+  padding: 1.35rem 1.4rem;
+}
+
+.crm-kpi-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+}
+
+.crm-kpi-label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--crm-text-muted);
+  margin-bottom: 0.35rem;
+}
+
+.crm-kpi-value {
+  font-size: 1.68rem;
+  font-weight: 800;
+  color: var(--crm-text-primary);
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+/* ----------------------------------------------------------------------------
+ * Tier, KYC & AML Risk Badges
+ * ---------------------------------------------------------------------------- */
+.badge-tier-obsidian {
+  background-color: #0f172a;
+  color: #f8fafc;
+  border: 1px solid #334155;
+  font-weight: 600;
+  padding: 0.35em 0.7em;
+}
+
+.badge-tier-platinum {
+  background-color: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  font-weight: 600;
+  padding: 0.35em 0.7em;
+}
+
+.badge-tier-sapphire {
+  background-color: #f0fdf4;
+  color: #047857;
+  border: 1px solid #bbf7d0;
+  font-weight: 600;
+  padding: 0.35em 0.7em;
+}
+
+.badge-kyc-verified {
+  background-color: var(--crm-emerald-soft);
+  color: var(--crm-emerald);
+  font-weight: 600;
+}
+
+.badge-kyc-edd {
+  background-color: var(--crm-gold-soft);
+  color: var(--crm-gold);
+  font-weight: 600;
+}
+
+.badge-kyc-review {
+  background-color: var(--crm-crimson-soft);
+  color: var(--crm-crimson);
+  font-weight: 600;
+}
+
+/* ----------------------------------------------------------------------------
+ * High-Density Financial Data Tables
+ * ---------------------------------------------------------------------------- */
+.crm-table {
+  margin-bottom: 0;
+  vertical-align: middle;
+}
+
+.crm-table thead th {
+  background-color: #f8fafc;
+  color: #475569;
+  font-size: 0.73rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.85rem 1.1rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.crm-table tbody td {
+  padding: 0.92rem 1.1rem;
+  font-size: 0.88rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.crm-table tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+/* ----------------------------------------------------------------------------
+ * Avatar & Timeline Components
+ * ---------------------------------------------------------------------------- */
+.crm-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.crm-timeline {
+  position: relative;
+  padding-left: 1.5rem;
+}
+
+.crm-timeline::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  background-color: #e2e8f0;
+}
+
+.crm-timeline-item {
+  position: relative;
+  padding-bottom: 1.25rem;
+}
+
+.crm-timeline-dot {
+  position: absolute;
+  left: -1.5rem;
+  top: 4px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background-color: #2563eb;
+  border: 3px solid #ffffff;
+  box-shadow: 0 0 0 1px #cbd5e1;
+}
+
+/* ----------------------------------------------------------------------------
+ * Loan Pipeline Kanban Columns
+ * ---------------------------------------------------------------------------- */
+.kanban-board {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(240px, 1fr));
+  gap: 1rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+.kanban-column {
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--crm-radius-lg);
+  padding: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.kanban-card {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--crm-radius-md);
+  padding: 0.95rem;
+  box-shadow: var(--crm-shadow-sm);
+}
+
+/* ----------------------------------------------------------------------------
+ * Responsive Breakpoints
+ * ---------------------------------------------------------------------------- */
+@media (max-width: 991.98px) {
+  .crm-sidebar {
+    transform: translateX(-100%);
+  }
+  .crm-sidebar.show {
+    transform: translateX(0);
+  }
+  .crm-main {
+    margin-left: 0;
+  }
+}

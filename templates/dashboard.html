@@ -1,0 +1,305 @@
+<!-- ==========================================================================
+  Purpose: Executive & Relationship Manager Command Center Dashboard view.
+  Architecture/Context: Extends `base.html`; renders institutional KPI cards,
+    Chart.js AUM trajectory and asset allocation visualizations, top UHNW
+    client portfolio rankings, recent wire ledger activity, and urgent tasks.
+  Dependencies/Side Effects: Consumes `summary` dictionary from `GET /` and
+    embeds `#dashboardChartData` JSON for `static/js/app.js`.
+  Author: Pradeep Singh
+  License: Apache-2.0
+=========================================================================== -->
+{% extends "base.html" %}
+{% block title %}Executive Dashboard{% endblock %}
+
+{% block content %}
+<!-- Page Header & Quick Action Bar -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+  <div>
+    <h1 class="h4 fw-bold text-dark mb-1">Institutional Wealth &amp; Credit Command Center</h1>
+    <p class="text-secondary small mb-0">
+      Active Workspace: <strong class="text-dark">{{ current_advisor.full_name }}</strong> ({{ current_advisor.role_title }}) &bull; Real-time SQLite Telemetry
+    </p>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    <a href="{{ url_for('ledger_view') }}" class="btn btn-sm btn-outline-dark fw-semibold">
+      <i class="bi bi-send-check me-1"></i>Execute Wire / Transfer
+    </a>
+    <a href="{{ url_for('loans_view') }}" class="btn btn-sm btn-outline-primary fw-semibold">
+      <i class="bi bi-calculator me-1"></i>Originate Credit Facility
+    </a>
+    <button type="button" class="btn btn-sm btn-primary fw-semibold" data-bs-toggle="modal" data-bs-target="#onboardClientModal">
+      <i class="bi bi-person-plus-fill me-1"></i>Onboard Client
+    </button>
+  </div>
+</div>
+
+<!-- 4 Primary Institutional KPI Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    <div class="crm-card crm-kpi-card crm-card-hover h-100">
+      <div class="d-flex align-items-start justify-content-between mb-2">
+        <div>
+          <div class="crm-kpi-label">Total Assets Under Mgmt</div>
+          <div class="crm-kpi-value font-mono">{{ summary.kpis.total_aum_usd | usd_compact }}</div>
+        </div>
+        <div class="crm-kpi-icon bg-primary bg-opacity-10 text-primary">
+          <i class="bi bi-safe2-fill"></i>
+        </div>
+      </div>
+      <div class="d-flex align-items-center justify-content-between small mt-2 pt-2 border-top">
+        <span class="text-success fw-semibold"><i class="bi bi-arrow-up-right"></i> +14.2% YoY</span>
+        <span class="text-muted font-mono">{{ summary.kpis.client_count }} Active Clients</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-xl-3">
+    <div class="crm-card crm-kpi-card crm-card-hover h-100">
+      <div class="d-flex align-items-start justify-content-between mb-2">
+        <div>
+          <div class="crm-kpi-label">Active Credit Pipeline</div>
+          <div class="crm-kpi-value font-mono">{{ summary.kpis.loan_pipeline_usd | usd_compact }}</div>
+        </div>
+        <div class="crm-kpi-icon bg-info bg-opacity-10 text-info-emphasis">
+          <i class="bi bi-briefcase-fill"></i>
+        </div>
+      </div>
+      <div class="d-flex align-items-center justify-content-between small mt-2 pt-2 border-top">
+        <span class="text-secondary fw-semibold">{{ summary.kpis.loan_count }} Facilities</span>
+        <span class="text-primary font-mono fw-semibold">Avg {{ summary.kpis.avg_loan_rate_pct }}% APR</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-xl-3">
+    <div class="crm-card crm-kpi-card crm-card-hover h-100">
+      <div class="d-flex align-items-start justify-content-between mb-2">
+        <div>
+          <div class="crm-kpi-label">Net Liquidity Flow (MTD)</div>
+          <div class="crm-kpi-value font-mono {% if summary.kpis.net_inflows_usd >= 0 %}text-success{% else %}text-danger{% endif %}">
+            {{ summary.kpis.net_inflows_usd | usd_compact }}
+          </div>
+        </div>
+        <div class="crm-kpi-icon bg-success bg-opacity-10 text-success">
+          <i class="bi bi-graph-up-arrow"></i>
+        </div>
+      </div>
+      <div class="d-flex align-items-center justify-content-between small mt-2 pt-2 border-top">
+        <span class="text-success font-mono">In: {{ summary.kpis.gross_inflows_usd | usd_compact }}</span>
+        <span class="text-secondary font-mono">Out: {{ summary.kpis.gross_outflows_usd | usd_compact }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-xl-3">
+    <div class="crm-card crm-kpi-card crm-card-hover h-100">
+      <div class="d-flex align-items-start justify-content-between mb-2">
+        <div>
+          <div class="crm-kpi-label">Compliance &amp; Risk Queue</div>
+          <div class="crm-kpi-value font-mono {% if summary.kpis.flagged_txn_count > 0 %}text-danger{% else %}text-dark{% endif %}">
+            {{ summary.kpis.flagged_txn_count }} Flagged
+          </div>
+        </div>
+        <div class="crm-kpi-icon bg-danger bg-opacity-10 text-danger">
+          <i class="bi bi-shield-lock-fill"></i>
+        </div>
+      </div>
+      <div class="d-flex align-items-center justify-content-between small mt-2 pt-2 border-top">
+        <span class="text-danger fw-semibold">{{ summary.kpis.critical_tasks_count }} Critical Tasks</span>
+        <span class="text-muted font-mono">Avg FICO: {{ summary.kpis.avg_credit_score }}</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Chart.js Analytics Row -->
+<script id="dashboardChartData" type="application/json">
+  {{ summary.charts | tojson }}
+</script>
+
+<div class="row g-3 mb-4">
+  <div class="col-lg-8">
+    <div class="crm-card p-4 h-100">
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <div>
+          <h2 class="h6 fw-bold text-dark mb-0">Institutional Assets Under Management (AUM) Trajectory</h2>
+          <p class="text-muted small mb-0">6-month rolling private wealth &amp; commercial treasury balances ($ Millions USD)</p>
+        </div>
+        <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-mono">Live SQLite Aggregation</span>
+      </div>
+      <div style="height: 265px;">
+        <canvas id="aumTrendChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="crm-card p-4 h-100">
+      <div class="mb-3">
+        <h2 class="h6 fw-bold text-dark mb-0">Depository &amp; Custody Mix</h2>
+        <p class="text-muted small mb-0">Balance distribution by institutional account product</p>
+      </div>
+      <div style="height: 265px;">
+        <canvas id="assetAllocationChart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Top Clients by AUM & Urgent Advisor Action Queue -->
+<div class="row g-3 mb-4">
+  <div class="col-xl-7">
+    <div class="crm-card overflow-hidden h-100">
+      <div class="p-3 px-4 border-bottom d-flex align-items-center justify-content-between">
+        <div>
+          <h2 class="h6 fw-bold text-dark mb-0">Key Institutional &amp; UHNW Relationships</h2>
+          <p class="text-muted small mb-0">Ranked by consolidated Assets Under Management (AUM)</p>
+        </div>
+        <a href="{{ url_for('customers_view') }}" class="btn btn-sm btn-outline-primary fw-semibold">
+          View All ({{ summary.kpis.client_count }})
+        </a>
+      </div>
+      <div class="table-responsive">
+        <table class="table crm-table">
+          <thead>
+            <tr>
+              <th>Client &amp; Entity</th>
+              <th>Service Tier</th>
+              <th>KYC / AML</th>
+              <th class="text-end">Total AUM</th>
+              <th class="text-end">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in summary.top_customers %}
+            <tr>
+              <td>
+                <div class="fw-bold text-dark">{{ c.full_name }}</div>
+                <div class="text-muted small">{{ c.company_name }} &bull; <span class="font-mono">{{ c.cif_number }}</span></div>
+              </td>
+              <td>
+                <span class="badge rounded-pill {% if 'Obsidian' in c.tier %}badge-tier-obsidian{% elif 'Platinum' in c.tier %}badge-tier-platinum{% else %}badge-tier-sapphire{% endif %}">
+                  {{ c.tier }}
+                </span>
+              </td>
+              <td>
+                <span class="badge {% if c.kyc_status == 'Verified' %}badge-kyc-verified{% elif 'Enhanced' in c.kyc_status %}badge-kyc-edd{% else %}badge-kyc-review{% endif %}">
+                  {{ c.kyc_status }}
+                </span>
+              </td>
+              <td class="text-end font-mono fw-bold text-dark">{{ c.total_aum_usd | usd }}</td>
+              <td class="text-end">
+                <a href="{{ url_for('customer_detail_view', customer_id=c.id) }}" class="btn btn-sm btn-light border fw-semibold">
+                  360 Dossier <i class="bi bi-arrow-up-right ms-1"></i>
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Priority Action & Compliance Queue -->
+  <div class="col-xl-5">
+    <div class="crm-card overflow-hidden h-100 d-flex flex-column">
+      <div class="p-3 px-4 border-bottom d-flex align-items-center justify-content-between">
+        <div>
+          <h2 class="h6 fw-bold text-dark mb-0">Priority Relationship &amp; AML Action Queue</h2>
+          <p class="text-muted small mb-0">Immediate deliverables across underwriting &amp; compliance</p>
+        </div>
+        <a href="{{ url_for('tasks_view') }}" class="btn btn-sm btn-outline-secondary fw-semibold">All Tasks</a>
+      </div>
+      <div class="list-group list-group-flush flex-grow-1">
+        {% for tk in summary.urgent_tasks %}
+        <div class="list-group-item p-3 px-4 d-flex align-items-start justify-content-between gap-3">
+          <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+              <span class="badge {% if tk.priority == 'Critical' %}bg-danger{% elif tk.priority == 'High' %}bg-warning text-dark{% else %}bg-info text-dark{% endif %}">
+                {{ tk.priority }}
+              </span>
+              <span class="badge bg-light text-secondary border">{{ tk.category }}</span>
+              <span class="text-muted small font-mono">Due {{ tk.due_date }}</span>
+            </div>
+            <div class="fw-semibold text-dark small mb-1">{{ tk.title }}</div>
+            <div class="text-muted" style="font-size:0.78rem;">
+              Client: <a href="{{ url_for('customer_detail_view', customer_id=tk.customer_id) }}" class="text-decoration-none fw-semibold">{{ tk.customer_name }}</a>
+              &bull; Owner: {{ tk.assigned_to }}
+            </div>
+          </div>
+          <form action="{{ url_for('toggle_task_action', task_id=tk.id) }}" method="POST">
+            <button type="submit" class="btn btn-sm btn-outline-success" title="Mark Task Completed">
+              <i class="bi bi-check2-lg"></i>
+            </button>
+          </form>
+        </div>
+        {% else %}
+        <div class="p-4 text-center text-muted small">All urgent tasks are completed.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Recent Institutional Wire & Account Ledger Feed -->
+<div class="crm-card overflow-hidden">
+  <div class="p-3 px-4 border-bottom d-flex align-items-center justify-content-between">
+    <div>
+      <h2 class="h6 fw-bold text-dark mb-0">Recent Institutional Wire &amp; Treasury Settlements</h2>
+      <p class="text-muted small mb-0">Live feed of SWIFT, FEDWIRE, ACH, and internal book transfers</p>
+    </div>
+    <a href="{{ url_for('ledger_view') }}" class="btn btn-sm btn-outline-dark fw-semibold">
+      Open Full Wire Ledger <i class="bi bi-arrow-right ms-1"></i>
+    </a>
+  </div>
+  <div class="table-responsive">
+    <table class="table crm-table">
+      <thead>
+        <tr>
+          <th>Reference &amp; Timestamp</th>
+          <th>Client &amp; Account</th>
+          <th>Channel &amp; Counterparty</th>
+          <th>Status / AML Screening</th>
+          <th class="text-end">Amount (USD)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for tx in summary.recent_transactions %}
+        <tr>
+          <td>
+            <div class="font-mono fw-semibold text-dark">{{ tx.reference_id }}</div>
+            <div class="text-muted small font-mono">{{ tx.created_at }}</div>
+          </td>
+          <td>
+            <a href="{{ url_for('customer_detail_view', customer_id=tx.customer_id) }}" class="fw-bold text-dark text-decoration-none">
+              {{ tx.customer_name }}
+            </a>
+            <div class="text-muted small font-mono">{{ tx.account_number }}</div>
+          </td>
+          <td>
+            <div class="fw-semibold text-dark">{{ tx.counterparty }}</div>
+            <div class="text-muted small">{{ tx.channel }} &bull; {{ tx.category }}</div>
+          </td>
+          <td>
+            {% if tx.risk_flag == 1 %}
+              <span class="badge bg-danger-subtle text-danger border border-danger-subtle">
+                <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ tx.status }}
+              </span>
+              <div class="text-danger mt-1" style="font-size:0.74rem;">{{ tx.risk_reason }}</div>
+            {% else %}
+              <span class="badge bg-success-subtle text-success border border-success-subtle">
+                <i class="bi bi-check-circle-fill me-1"></i>{{ tx.status }}
+              </span>
+            {% endif %}
+          </td>
+          <td class="text-end font-mono fw-bold {% if tx.txn_type == 'Credit' %}text-success{% else %}text-dark{% endif %}">
+            {% if tx.txn_type == 'Credit' %}+{% else %}-{% endif %}{{ tx.amount_usd | usd }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,53 @@
+# ==============================================================================
+# Purpose: Git exclusion rules for the Aurelia Bank CRM MCP Server application.
+# Architecture/Context: Prevents credentials, virtual environments, and local
+#   SQLite database artifacts inside `mcp_server/` from being committed to VCS.
+# Dependencies/Side Effects: Consumed by Git CLI and container build contexts.
+# Author: Pradeep Singh
+# License: Apache-2.0
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Secrets & Credential Protection
+# ------------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*credentials*.json
+*service-account*.json
+secrets/
+
+# ------------------------------------------------------------------------------
+# 2. Build, Runtime & Dependency Artifacts
+# ------------------------------------------------------------------------------
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+
+# SQLite Runtime Databases & WAL Files
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-shm
+*.db-wal
+
+# ------------------------------------------------------------------------------
+# 3. OS & IDE Noise
+# ------------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*~
