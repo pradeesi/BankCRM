@@ -209,11 +209,12 @@ def ensure_database_ready(db_path: str, auto_seed: bool = True) -> None:
 
 
 def _seed_standalone_fallback(db_path: str) -> None:
-    """Seed baseline institutional records when running in an isolated container.
+    """Seed the canonical 8-client institutional dataset when running in an isolated container.
 
     Summary:
-        Populates core clients, accounts, transactions, loans, tasks, and NBA
-        offers when the parent `bank_crm.db` is not mounted.
+        Populates all 3 advisors, 8 UHNW/Commercial clients, 17 accounts, 10 ledger
+        transactions (including AML-flagged wires), 7 credit facilities, 6 interactions,
+        7 tasks, and 7 Next-Best-Action offers when parent `bank_crm.db` is not mounted.
 
     Parameters:
         db_path (str): Filesystem path to the SQLite database file.
@@ -221,45 +222,93 @@ def _seed_standalone_fallback(db_path: str) -> None:
     Returns:
         None
     """
+    advisors = [
+        ("ADV-101", "Elena Rostova", "elena.rostova@aureliabank.com", "Managing Director — Private Wealth", "Private Client Group", "New York — Park Ave Flagship", "ER", "2022-03-14"),
+        ("ADV-102", "Marcus Vance", "marcus.vance@aureliabank.com", "SVP — Commercial Credit & Treasury", "Institutional & Commercial Banking", "New York — Wall Street", "MV", "2021-07-01"),
+        ("ADV-103", "Sophia Chen", "sophia.chen@aureliabank.com", "Chief Compliance & AML Risk Officer", "Global Risk & Financial Crime", "San Francisco — Embarcadero", "SC", "2020-11-09"),
+    ]
+    customers = [
+        ("CIF-904821", "Alexander Sterling", "Sterling Quantum Ventures LLC", "Ultra-High-Net-Worth (UHNW)", "Obsidian Private", "a.sterling@sterlingquantum.io", "+1 (212) 555-0194", "New York", "United States", "Verified", "Low", 832, 4850000.00, 0.0, "Elena Rostova", "2019-04-12", "2026-10-12", 50, 20, 20, 10),
+        ("CIF-904822", "Victoria Al-Mansoor", "Crescent Maritime Holdings", "Institutional & Family Office", "Obsidian Private", "victoria@crescentmaritime.ae", "+1 (305) 555-0148", "Miami", "United States", "Enhanced Due Diligence", "Medium", 798, 6200000.00, 0.0, "Elena Rostova", "2020-09-23", "2026-10-10", 35, 35, 20, 10),
+        ("CIF-904823", "Dr. Henrik Lindqvist", "Nordic BioTherapeutics Inc.", "Commercial & Executive", "Platinum Sovereign", "hlindqvist@nordicbio.com", "+1 (617) 555-0172", "Boston", "United States", "Verified", "Low", 815, 2150000.00, 0.0, "Marcus Vance", "2021-02-18", "2026-10-13", 55, 25, 10, 10),
+        ("CIF-904824", "Camila Montoya-Vega", "Solstice Renewable Infrastructure", "Commercial & Executive", "Platinum Sovereign", "cmontoya@solsticegrid.com", "+1 (415) 555-0183", "San Francisco", "United States", "Verified", "Low", 784, 1750000.00, 0.0, "Marcus Vance", "2022-06-05", "2026-10-08", 40, 30, 20, 10),
+        ("CIF-904825", "Julian Thorne", "Thorne Heritage Real Estate Partners", "High-Net-Worth (HNW)", "Platinum Sovereign", "jthorne@thorneheritage.com", "+1 (312) 555-0166", "Chicago", "United States", "Verified", "Low", 762, 1320000.00, 0.0, "Elena Rostova", "2021-11-30", "2026-10-05", 30, 40, 20, 10),
+        ("CIF-904826", "Nadia Kovalenko", "Aether Orbital Systems Corp", "Commercial & Executive", "Sapphire Premier", "n.kovalenko@aetherorbital.space", "+1 (206) 555-0129", "Seattle", "United States", "Periodic Review Due", "High", 741, 980000.00, 0.0, "Sophia Chen", "2023-01-19", "2026-10-11", 60, 15, 15, 10),
+        ("CIF-904827", "Devonshire Family Trust (Arthur & Clara)", "Devonshire Philanthropic Endowment", "Institutional & Family Office", "Obsidian Private", "trustees@devonshireendowment.org", "+1 (212) 555-0115", "Greenwich", "United States", "Verified", "Low", 840, 5400000.00, 0.0, "Elena Rostova", "2018-08-01", "2026-10-14", 25, 50, 15, 10),
+        ("CIF-904828", "Rohan Deshmukh", "Vanguard Silicon Photonics", "Affluent & Emerging Wealth", "Sapphire Premier", "rohan@vanguardsilicon.com", "+1 (408) 555-0151", "Palo Alto", "United States", "Verified", "Low", 791, 890000.00, 0.0, "Marcus Vance", "2023-09-14", "2026-10-09", 65, 20, 5, 10),
+    ]
+    accounts = [
+        ("AUR-8801-0019", 1, "Private Wealth Advisory Portfolio", "USD", 14250000.00, 5.15, "Active", "2019-04-15"),
+        ("AUR-8801-0042", 1, "Commercial Treasury Sweep", "USD", 4820000.00, 4.75, "Active", "2020-01-10"),
+        ("AUR-8801-0088", 1, "Sovereign Liquidity Checking", "USD", 685000.00, 1.25, "Active", "2019-04-12"),
+        ("AUR-8802-0104", 2, "Family Office Global Custody", "USD", 22400000.00, 5.30, "Active", "2020-09-25"),
+        ("AUR-8802-0119", 2, "Maritime Trade Escrow Facility", "USD", 6150000.00, 4.60, "Active", "2021-03-18"),
+        ("AUR-8803-0201", 3, "Executive Managed Equities", "USD", 5420000.00, 4.95, "Active", "2021-02-20"),
+        ("AUR-8803-0245", 3, "R&D Corporate Operating Account", "USD", 3190000.00, 3.85, "Active", "2021-05-11"),
+        ("AUR-8804-0312", 4, "Green Bond & Treasury Reserve", "USD", 6780000.00, 5.10, "Active", "2022-06-08"),
+        ("AUR-8804-0350", 4, "Commercial Operating Checking", "USD", 1450000.00, 2.10, "Active", "2022-06-05"),
+        ("AUR-8805-0409", 5, "Real Estate Acquisition Liquidity", "USD", 4350000.00, 4.80, "Active", "2021-12-02"),
+        ("AUR-8805-0441", 5, "Private High-Yield Money Market", "USD", 1890000.00, 4.90, "Active", "2022-04-19"),
+        ("AUR-8806-0518", 6, "Aerospace Treasury Clearing", "USD", 2940000.00, 4.45, "Active", "2023-01-22"),
+        ("AUR-8806-0577", 6, "International FX Settlement", "USD", 840000.00, 3.20, "Under Review", "2023-07-14"),
+        ("AUR-8807-0601", 7, "Endowment Fixed Income Trust", "USD", 19800000.00, 5.40, "Active", "2018-08-03"),
+        ("AUR-8807-0633", 7, "Philanthropic Grant Disbursement", "USD", 2650000.00, 4.10, "Active", "2019-01-15"),
+        ("AUR-8808-0710", 8, "Founder Equity Liquidity Vault", "USD", 3620000.00, 5.05, "Active", "2023-09-15"),
+        ("AUR-8808-0729", 8, "Premier Private Checking", "USD", 410000.00, 1.50, "Active", "2023-09-14"),
+    ]
+    transactions = [
+        ("TXN-20261014-901", 1, 1, "Credit", "Institutional Wire", 1250000.00, 14250000.00, "Goldman Sachs Prime Brokerage", "Capital Distribution", "Settled", 0, "", "2026-10-14 09:15:00"),
+        ("TXN-20261014-902", 4, 2, "Debit", "SWIFT International Wire", 890000.00, 22400000.00, "Port of Rotterdam Bunkering BV (NL)", "Cross-Border Trade Settlement", "Pending Compliance", 1, "Cross-border maritime wire > $500k requires Dual-Control OFAC/EDD sign-off", "2026-10-14 08:42:00"),
+        ("TXN-20261013-887", 7, 3, "Credit", "FEDWIRE", 640000.00, 3190000.00, "NIH Biomedical Grant Treasury", "Milestone Inflow", "Settled", 0, "", "2026-10-13 16:20:00"),
+        ("TXN-20261013-884", 13, 6, "Debit", "SWIFT International Wire", 415000.00, 840000.00, "precision-titanium-supply GmbH (Zurich)", "Aerospace Component Procurement", "Flagged — AML Review", 1, "High-value cross-border wire on account with Periodic KYC Review Due", "2026-10-13 14:05:00"),
+        ("TXN-20261011-859", 10, 5, "Debit", "FEDWIRE", 750000.00, 4350000.00, "Chicago Loop Title & Escrow Co.", "Commercial Property Earnest Deposit", "Settled", 1, "Large domestic real estate wire > $500k — Verified by Senior RM", "2026-10-11 15:12:00"),
+    ]
+    loans = [
+        ("LN-2026-4401", 1, "Securities-Backed Line of Credit (SBLOC)", "Quantum Computing Series B Co-Investment Liquidity", 6500000.00, 5.65, 36, 14250000.00, 45.6, 21.4, "Approved & Ready to Fund", "AAA — Prime Collateral", "2026-09-28", "Marcus Vance"),
+        ("LN-2026-4402", 2, "Commercial Maritime Fleet Facility", "Acquisition of 2 LNG-Ready Feeder Vessels", 14500000.00, 6.15, 84, 24000000.00, 60.4, 28.9, "Credit Committee Review", "AA — Institutional", "2026-10-02", "Marcus Vance"),
+        ("LN-2026-4403", 3, "Biotech Lab & Cleanroom Term Loan", "Cambridge Phase-III Biomanufacturing Expansion", 4800000.00, 5.90, 60, 7500000.00, 64.0, 24.5, "Underwriting & Financial Analysis", "AA+ — Strong Cashflow", "2026-10-06", "Marcus Vance"),
+        ("LN-2026-4404", 4, "Green Project Finance Bridge Facility", "Utility-Scale Battery Storage Interconnect (250MW)", 9200000.00, 5.75, 48, 14800000.00, 62.2, 26.8, "Credit Committee Review", "AA — ESG Qualified", "2026-10-04", "Marcus Vance"),
+        ("LN-2026-4405", 5, "Commercial Real Estate Senior Mortgage", "Refinancing Class-A Mixed-Use Tower — Fulton Market", 8400000.00, 6.35, 120, 12500000.00, 67.2, 33.1, "Underwriting & Financial Analysis", "A+ — Core CRE", "2026-10-08", "Marcus Vance"),
+        ("LN-2026-4406", 6, "Working Capital Revolving Line", "Satellite Propulsion Subsystem Inventory Financing", 2750000.00, 6.85, 24, 3800000.00, 72.4, 37.5, "Application & KYC Intake", "BBB+ — Enhanced Review", "2026-10-11", "Sophia Chen"),
+        ("LN-2026-4407", 8, "Jumbo Private Residential Mortgage", "Atherton Custom Estate Acquisition", 3900000.00, 5.50, 360, 5600000.00, 69.6, 27.2, "Disbursed & Active", "AAA — Prime Jumbo", "2026-09-10", "Elena Rostova"),
+    ]
+    nba_offers = [
+        (1, "Direct Indexing & Automated Tax-Loss Harvesting Mandate", "Private Wealth Management", 97, 42500.00, "High equity concentration (50%) and $4.85M annual income create ~$180k/yr tax-alpha opportunity.", "Recommended"),
+        (2, "Multi-Currency FX Forward Hedging Facility (EUR / USD)", "Global Treasury & FX", 95, 68000.00, "Recurring European maritime settlements ($890k+ monthly) expose cashflows to EUR/USD volatility.", "Recommended"),
+        (3, "Executive Key-Person & R&D Equipment Leasing Facility", "Commercial Structured Finance", 91, 34000.00, "Complements Phase-III cleanroom loan while preserving R&D equity runway.", "Recommended"),
+        (4, "Automated ESG Overnight Repo Treasury Sweep", "Commercial Treasury", 94, 29500.00, "Idle operating cash ($1.45M) qualifies for +265 bps higher yield in green repo sweep.", "Pitched — Client Reviewing"),
+        (5, "Interest Rate Cap & Swap Structure (SOFR 4.25% Ceiling)", "Derivatives & Risk Management", 89, 38000.00, "Protects $8.4M Fulton Market CRE refinancing against floating-rate DSCR compression.", "Recommended"),
+        (7, "Private Credit & Infrastructure Co-Investment Fund IV", "Alternative Investments", 93, 85000.00, "Matches endowment's 10-year horizon and 7.8% tax-exempt yield target.", "Recommended"),
+        (8, "10b5-1 Executive Equity Diversification & Collar Trust", "Founder Wealth Structuring", 96, 51000.00, "65% single-stock photonics equity exposure warrants zero-cost collar hedging.", "Recommended"),
+    ]
+
     with get_connection(db_path) as conn:
-        conn.execute(
-            """
-            INSERT INTO advisors (
-                advisor_code, full_name, email, role_title, department,
-                branch_location, avatar_initials, created_at
-            ) VALUES (
-                'ADV-101', 'Elena Rostova', 'elena.rostova@aureliabank.com',
-                'Managing Director — Private Wealth', 'Private Client Group',
-                'New York — Park Ave Flagship', 'ER', '2022-03-14'
-            )
-            """
+        conn.executemany(
+            "INSERT INTO advisors (advisor_code, full_name, email, role_title, department, branch_location, avatar_initials, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            advisors,
         )
-        conn.execute(
-            """
-            INSERT INTO customers (
-                cif_number, full_name, company_name, segment, tier, email, phone,
-                city, country, kyc_status, aml_risk_rating, credit_score,
-                annual_income_usd, total_aum_usd, relationship_manager,
-                onboarded_date, last_contact_date
-            ) VALUES (
-                'CIF-904821', 'Alexander Sterling', 'Sterling Quantum Ventures LLC',
-                'Ultra-High-Net-Worth (UHNW)', 'Obsidian Private',
-                'a.sterling@sterlingquantum.io', '+1 (212) 555-0194',
-                'New York', 'United States', 'Verified', 'Low', 832,
-                4850000.0, 19755000.0, 'Elena Rostova', '2019-04-12', '2026-10-12'
-            )
-            """
+        conn.executemany(
+            "INSERT INTO customers (cif_number, full_name, company_name, segment, tier, email, phone, city, country, kyc_status, aml_risk_rating, credit_score, annual_income_usd, total_aum_usd, relationship_manager, onboarded_date, last_contact_date, portfolio_equities_pct, portfolio_fixed_income_pct, portfolio_private_equity_pct, portfolio_cash_pct) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            customers,
         )
-        conn.execute(
-            """
-            INSERT INTO accounts (
-                account_number, customer_id, account_type, currency,
-                balance_usd, apy_rate, status, opened_date
-            ) VALUES
-                ('AUR-8801-0019', 1, 'Private Wealth Advisory Portfolio', 'USD', 14250000.0, 5.15, 'Active', '2019-04-15'),
-                ('AUR-8801-0042', 1, 'Commercial Treasury Sweep', 'USD', 4820000.0, 4.75, 'Active', '2020-01-10')
-            """
+        conn.executemany(
+            "INSERT INTO accounts (account_number, customer_id, account_type, currency, balance_usd, apy_rate, status, opened_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            accounts,
         )
+        conn.executemany(
+            "INSERT INTO transactions (reference_id, account_id, customer_id, txn_type, channel, amount_usd, balance_after_usd, counterparty, category, status, risk_flag, risk_reason, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            transactions,
+        )
+        conn.executemany(
+            "INSERT INTO loans (loan_number, customer_id, loan_type, purpose, principal_usd, interest_rate_pct, term_months, collateral_value_usd, ltv_ratio_pct, dti_ratio_pct, stage, underwriting_grade, submitted_date, assigned_underwriter) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            loans,
+        )
+        conn.executemany(
+            "INSERT INTO nba_offers (customer_id, product_name, product_category, match_score_pct, estimated_revenue_usd, rationale, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            nba_offers,
+        )
+        for c_row in conn.execute("SELECT id FROM customers").fetchall():
+            _sync_customer_aum(conn, int(c_row["id"]))
 
 
 def _sync_customer_aum(conn: sqlite3.Connection, customer_id: int) -> float:
